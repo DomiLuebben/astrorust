@@ -1,0 +1,9 @@
+/target/
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+*.local
+.DS_Store
+*.swp
+*.bak

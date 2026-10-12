@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Astrorust
+Comment=Professionelle Astrologie- und Ephemeriden-Software in Rust & Qt6
+Exec=/home/domi/.gemini/antigravity/scratch/astrorust/target/debug/astrorust
+Icon=/home/domi/.gemini/antigravity/scratch/astrorust/gui/astrorust.svg
+Terminal=false
+Type=Application
+Categories=Education;Science;Astronomy;
+StartupWMClass=Astrorust
