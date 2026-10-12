@@ -1,0 +1,332 @@
+# Deutschland
+Berlin|Deutschland|52.5200|13.4050|Europe/Berlin
+Hamburg|Deutschland|53.5511|9.9937|Europe/Berlin
+München|Deutschland|48.1351|11.5820|Europe/Berlin
+Köln|Deutschland|50.9375|6.9603|Europe/Berlin
+Frankfurt am Main|Deutschland|50.1109|8.6821|Europe/Berlin
+Stuttgart|Deutschland|48.7758|9.1829|Europe/Berlin
+Düsseldorf|Deutschland|51.2277|6.7735|Europe/Berlin
+Dortmund|Deutschland|51.5136|7.4653|Europe/Berlin
+Essen|Deutschland|51.4556|7.0116|Europe/Berlin
+Leipzig|Deutschland|51.3397|12.3731|Europe/Berlin
+Bremen|Deutschland|53.0793|8.8017|Europe/Berlin
+Dresden|Deutschland|51.0504|13.7373|Europe/Berlin
+Hannover|Deutschland|52.3759|9.7320|Europe/Berlin
+Nürnberg|Deutschland|49.4521|11.0767|Europe/Berlin
+Duisburg|Deutschland|51.4344|6.7623|Europe/Berlin
+Bochum|Deutschland|51.4818|7.2162|Europe/Berlin
+Wuppertal|Deutschland|51.2562|7.1508|Europe/Berlin
+Bielefeld|Deutschland|52.0302|8.5325|Europe/Berlin
+Bonn|Deutschland|50.7374|7.0982|Europe/Berlin
+Münster|Deutschland|51.9607|7.6261|Europe/Berlin
+Mannheim|Deutschland|49.4875|8.4660|Europe/Berlin
+Karlsruhe|Deutschland|49.0069|8.4037|Europe/Berlin
+Augsburg|Deutschland|48.3705|10.8978|Europe/Berlin
+Wiesbaden|Deutschland|50.0782|8.2398|Europe/Berlin
+Mönchengladbach|Deutschland|51.1805|6.4428|Europe/Berlin
+Gelsenkirchen|Deutschland|51.5177|7.0857|Europe/Berlin
+Braunschweig|Deutschland|52.2689|10.5268|Europe/Berlin
+Aachen|Deutschland|50.7753|6.0839|Europe/Berlin
+Kiel|Deutschland|54.3233|10.1228|Europe/Berlin
+Chemnitz|Deutschland|50.8278|12.9214|Europe/Berlin
+Halle (Saale)|Deutschland|51.4828|11.9697|Europe/Berlin
+Magdeburg|Deutschland|52.1205|11.6276|Europe/Berlin
+Freiburg im Breisgau|Deutschland|47.9990|7.8421|Europe/Berlin
+Krefeld|Deutschland|51.3388|6.5853|Europe/Berlin
+Lübeck|Deutschland|53.8655|10.6866|Europe/Berlin
+Oberhausen|Deutschland|51.4963|6.8638|Europe/Berlin
+Erfurt|Deutschland|50.9848|11.0299|Europe/Berlin
+Mainz|Deutschland|49.9929|8.2473|Europe/Berlin
+Rostock|Deutschland|54.0924|12.0991|Europe/Berlin
+Kassel|Deutschland|51.3127|9.4797|Europe/Berlin
+Hagen|Deutschland|51.3671|7.4633|Europe/Berlin
+Saarbrücken|Deutschland|49.2402|6.9969|Europe/Berlin
+Potsdam|Deutschland|52.3906|13.0645|Europe/Berlin
+Ludwigshafen am Rhein|Deutschland|49.4774|8.4452|Europe/Berlin
+Oldenburg|Deutschland|53.1435|8.2146|Europe/Berlin
+Osnabrück|Deutschland|52.2799|8.0472|Europe/Berlin
+Leverkusen|Deutschland|51.0459|6.9844|Europe/Berlin
+Heidelberg|Deutschland|49.3988|8.6724|Europe/Berlin
+Darmstadt|Deutschland|49.8728|8.6512|Europe/Berlin
+Solingen|Deutschland|51.1652|7.0671|Europe/Berlin
+Regensburg|Deutschland|49.0134|12.1016|Europe/Berlin
+Würzburg|Deutschland|49.7913|9.9534|Europe/Berlin
+Ingolstadt|Deutschland|48.7665|11.4258|Europe/Berlin
+Ulm|Deutschland|48.4011|9.9876|Europe/Berlin
+Wolfsburg|Deutschland|52.4227|10.7865|Europe/Berlin
+Göttingen|Deutschland|51.5413|9.9158|Europe/Berlin
+Heilbronn|Deutschland|49.1427|9.2109|Europe/Berlin
+Pforzheim|Deutschland|48.8922|8.6946|Europe/Berlin
+Offenbach am Main|Deutschland|50.0956|8.7761|Europe/Berlin
+Reutlingen|Deutschland|48.4914|9.2043|Europe/Berlin
+Bremerhaven|Deutschland|53.5396|8.5809|Europe/Berlin
+Trier|Deutschland|49.7499|6.6371|Europe/Berlin
+Jena|Deutschland|50.9272|11.5892|Europe/Berlin
+Koblenz|Deutschland|50.3569|7.5890|Europe/Berlin
+Konstanz|Deutschland|47.6779|9.1732|Europe/Berlin
+Flensburg|Deutschland|54.7937|9.4469|Europe/Berlin
+Passau|Deutschland|48.5667|13.4319|Europe/Berlin
+Bamberg|Deutschland|49.8988|10.9028|Europe/Berlin
+Bayreuth|Deutschland|49.9456|11.5713|Europe/Berlin
+Paderborn|Deutschland|51.7189|8.7544|Europe/Berlin
+Cottbus|Deutschland|51.7563|14.3329|Europe/Berlin
+Schwerin|Deutschland|53.6355|11.4012|Europe/Berlin
+Greifswald|Deutschland|54.0865|13.3924|Europe/Berlin
+Neubrandenburg|Deutschland|53.5578|13.2618|Europe/Berlin
+Gera|Deutschland|50.8814|12.0820|Europe/Berlin
+Zwickau|Deutschland|50.7189|12.4921|Europe/Berlin
+Weimar|Deutschland|50.9795|11.3235|Europe/Berlin
+Fulda|Deutschland|50.5558|9.6808|Europe/Berlin
+Gießen|Deutschland|50.5841|8.6784|Europe/Berlin
+Marburg|Deutschland|50.8021|8.7667|Europe/Berlin
+Kempten (Allgäu)|Deutschland|47.7267|10.3139|Europe/Berlin
+Rosenheim|Deutschland|47.8561|12.1289|Europe/Berlin
+Lüneburg|Deutschland|53.2464|10.4115|Europe/Berlin
+Hameln|Deutschland|52.1038|9.3586|Europe/Berlin
+Celle|Deutschland|52.6226|10.0805|Europe/Berlin
+Hildesheim|Deutschland|52.1508|9.9511|Europe/Berlin
+Salzgitter|Deutschland|52.1500|10.3333|Europe/Berlin
+Stralsund|Deutschland|54.3095|13.0889|Europe/Berlin
+Wismar|Deutschland|53.8932|11.4580|Europe/Berlin
+Husum|Deutschland|54.4858|9.0522|Europe/Berlin
+Worms|Deutschland|49.6341|8.3507|Europe/Berlin
+Speyer|Deutschland|49.3173|8.4310|Europe/Berlin
+Landshut|Deutschland|48.5373|12.1520|Europe/Berlin
+Straubing|Deutschland|48.8776|12.5736|Europe/Berlin
+Hof|Deutschland|50.3167|11.9167|Europe/Berlin
+Kaiserslautern|Deutschland|49.4401|7.7491|Europe/Berlin
+Neuss|Deutschland|51.1981|6.6915|Europe/Berlin
+Moers|Deutschland|51.4510|6.6260|Europe/Berlin
+Ratingen|Deutschland|51.2975|6.8500|Europe/Berlin
+Gütersloh|Deutschland|51.9067|8.3786|Europe/Berlin
+Siegen|Deutschland|50.8748|8.0243|Europe/Berlin
+Iserlohn|Deutschland|51.3759|7.7019|Europe/Berlin
+Marl|Deutschland|51.6567|7.0939|Europe/Berlin
+Lünen|Deutschland|51.6167|7.5333|Europe/Berlin
+Dessau-Roßlau|Deutschland|51.8353|12.2462|Europe/Berlin
+Stendal|Deutschland|52.6064|11.8586|Europe/Berlin
+Bad Kreuznach|Deutschland|49.8452|7.8672|Europe/Berlin
+Frankfurt (Oder)|Deutschland|52.3471|14.5506|Europe/Berlin
+# Österreich
+Wien|Österreich|48.2082|16.3738|Europe/Vienna
+Graz|Österreich|47.0707|15.4395|Europe/Vienna
+Linz|Österreich|48.3069|14.2858|Europe/Vienna
+Salzburg|Österreich|47.8095|13.0550|Europe/Vienna
+Innsbruck|Österreich|47.2692|11.4041|Europe/Vienna
+Klagenfurt|Österreich|46.6247|14.3053|Europe/Vienna
+Villach|Österreich|46.6111|13.8558|Europe/Vienna
+Wels|Österreich|48.1575|14.0289|Europe/Vienna
+St. Pölten|Österreich|48.2047|15.6256|Europe/Vienna
+Dornbirn|Österreich|47.4125|9.7417|Europe/Vienna
+Bregenz|Österreich|47.5031|9.7471|Europe/Vienna
+Wiener Neustadt|Österreich|47.8153|16.2436|Europe/Vienna
+Steyr|Österreich|48.0427|14.4215|Europe/Vienna
+Feldkirch|Österreich|47.2386|9.5982|Europe/Vienna
+Leoben|Österreich|47.3836|15.0925|Europe/Vienna
+Krems an der Donau|Österreich|48.4097|15.6147|Europe/Vienna
+Eisenstadt|Österreich|47.8450|16.5233|Europe/Vienna
+# Schweiz / Liechtenstein
+Zürich|Schweiz|47.3769|8.5417|Europe/Zurich
+Genf|Schweiz|46.2044|6.1432|Europe/Zurich
+Basel|Schweiz|47.5596|7.5886|Europe/Zurich
+Bern|Schweiz|46.9480|7.4474|Europe/Zurich
+Lausanne|Schweiz|46.5197|6.6323|Europe/Zurich
+Winterthur|Schweiz|47.4988|8.7241|Europe/Zurich
+Luzern|Schweiz|47.0502|8.3093|Europe/Zurich
+St. Gallen|Schweiz|47.4245|9.3767|Europe/Zurich
+Lugano|Schweiz|46.0037|8.9511|Europe/Zurich
+Biel/Bienne|Schweiz|47.1368|7.2467|Europe/Zurich
+Thun|Schweiz|46.7580|7.6280|Europe/Zurich
+Chur|Schweiz|46.8499|9.5329|Europe/Zurich
+Schaffhausen|Schweiz|47.6970|8.6349|Europe/Zurich
+Freiburg (Schweiz)|Schweiz|46.8065|7.1615|Europe/Zurich
+Neuenburg|Schweiz|46.9896|6.9293|Europe/Zurich
+Sitten|Schweiz|46.2293|7.3590|Europe/Zurich
+Zug|Schweiz|47.1724|8.5176|Europe/Zurich
+Kesswil|Schweiz|47.5954|9.3175|Europe/Zurich
+Bellinzona|Schweiz|46.1946|9.0239|Europe/Zurich
+Locarno|Schweiz|46.1700|8.7994|Europe/Zurich
+Davos|Schweiz|46.8027|9.8360|Europe/Zurich
+Interlaken|Schweiz|46.6863|7.8632|Europe/Zurich
+Vaduz|Liechtenstein|47.1410|9.5209|Europe/Vaduz
+# Europa
+London|Großbritannien|51.5074|-0.1278|Europe/London
+Manchester|Großbritannien|53.4808|-2.2426|Europe/London
+Edinburgh|Großbritannien|55.9533|-3.1883|Europe/London
+Birmingham|Großbritannien|52.4862|-1.8904|Europe/London
+Glasgow|Großbritannien|55.8642|-4.2518|Europe/London
+Liverpool|Großbritannien|53.4084|-2.9916|Europe/London
+Dublin|Irland|53.3498|-6.2603|Europe/Dublin
+Paris|Frankreich|48.8566|2.3522|Europe/Paris
+Marseille|Frankreich|43.2965|5.3698|Europe/Paris
+Lyon|Frankreich|45.7640|4.8357|Europe/Paris
+Straßburg|Frankreich|48.5734|7.7521|Europe/Paris
+Nizza|Frankreich|43.7102|7.2620|Europe/Paris
+Bordeaux|Frankreich|44.8378|-0.5792|Europe/Paris
+Toulouse|Frankreich|43.6047|1.4442|Europe/Paris
+Lille|Frankreich|50.6292|3.0573|Europe/Paris
+Nantes|Frankreich|47.2184|-1.5536|Europe/Paris
+Rom|Italien|41.9028|12.4964|Europe/Rome
+Mailand|Italien|45.4642|9.1900|Europe/Rome
+Neapel|Italien|40.8518|14.2681|Europe/Rome
+Florenz|Italien|43.7696|11.2558|Europe/Rome
+Venedig|Italien|45.4408|12.3155|Europe/Rome
+Turin|Italien|45.0703|7.6869|Europe/Rome
+Bologna|Italien|44.4949|11.3426|Europe/Rome
+Genua|Italien|44.4056|8.9463|Europe/Rome
+Palermo|Italien|38.1157|13.3615|Europe/Rome
+Vinci|Italien|43.7844|10.9250|Europe/Rome
+Bozen|Italien|46.4983|11.3548|Europe/Rome
+Madrid|Spanien|40.4168|-3.7038|Europe/Madrid
+Barcelona|Spanien|41.3874|2.1686|Europe/Madrid
+Sevilla|Spanien|37.3891|-5.9845|Europe/Madrid
+Valencia|Spanien|39.4699|-0.3763|Europe/Madrid
+Lissabon|Portugal|38.7223|-9.1393|Europe/Lisbon
+Porto|Portugal|41.1579|-8.6291|Europe/Lisbon
+Amsterdam|Niederlande|52.3676|4.9041|Europe/Amsterdam
+Rotterdam|Niederlande|51.9244|4.4777|Europe/Amsterdam
+Brüssel|Belgien|50.8503|4.3517|Europe/Brussels
+Antwerpen|Belgien|51.2194|4.4025|Europe/Brussels
+Gent|Belgien|51.0543|3.7174|Europe/Brussels
+Luxemburg|Luxemburg|49.6116|6.1319|Europe/Luxembourg
+Kopenhagen|Dänemark|55.6761|12.5683|Europe/Copenhagen
+Stockholm|Schweden|59.3293|18.0686|Europe/Stockholm
+Göteborg|Schweden|57.7089|11.9746|Europe/Stockholm
+Oslo|Norwegen|59.9139|10.7522|Europe/Oslo
+Helsinki|Finnland|60.1699|24.9384|Europe/Helsinki
+Reykjavik|Island|64.1466|-21.9426|Atlantic/Reykjavik
+Prag|Tschechien|50.0755|14.4378|Europe/Prague
+Brünn|Tschechien|49.1951|16.6068|Europe/Prague
+Warschau|Polen|52.2297|21.0122|Europe/Warsaw
+Krakau|Polen|50.0647|19.9450|Europe/Warsaw
+Danzig|Polen|54.3520|18.6466|Europe/Warsaw
+Breslau|Polen|51.1079|17.0385|Europe/Warsaw
+Posen|Polen|52.4064|16.9252|Europe/Warsaw
+Lodz|Polen|51.7592|19.4560|Europe/Warsaw
+Budapest|Ungarn|47.4979|19.0402|Europe/Budapest
+Bratislava|Slowakei|48.1486|17.1077|Europe/Bratislava
+Ljubljana|Slowenien|46.0569|14.5058|Europe/Ljubljana
+Zagreb|Kroatien|45.8150|15.9819|Europe/Zagreb
+Belgrad|Serbien|44.7866|20.4489|Europe/Belgrade
+Titel|Serbien|45.2056|20.0944|Europe/Belgrade
+Bukarest|Rumänien|44.4268|26.1025|Europe/Bucharest
+Sofia|Bulgarien|42.6977|23.3219|Europe/Sofia
+Athen|Griechenland|37.9838|23.7275|Europe/Athens
+Thessaloniki|Griechenland|40.6401|22.9444|Europe/Athens
+Istanbul|Türkei|41.0082|28.9784|Europe/Istanbul
+Ankara|Türkei|39.9334|32.8597|Europe/Istanbul
+Moskau|Russland|55.7558|37.6173|Europe/Moscow
+Sankt Petersburg|Russland|59.9311|30.3609|Europe/Moscow
+Kiew|Ukraine|50.4501|30.5234|Europe/Kyiv
+Minsk|Weißrussland|53.9006|27.5590|Europe/Minsk
+Riga|Lettland|56.9496|24.1052|Europe/Riga
+Vilnius|Litauen|54.6872|25.2797|Europe/Vilnius
+Tallinn|Estland|59.4370|24.7536|Europe/Tallinn
+Valletta|Malta|35.8989|14.5146|Europe/Malta
+Nikosia|Zypern|35.1856|33.3823|Asia/Nicosia
+# Nordamerika
+New York|USA|40.7128|-74.0060|America/New_York
+Los Angeles|USA|34.0522|-118.2437|America/Los_Angeles
+Chicago|USA|41.8781|-87.6298|America/Chicago
+Houston|USA|29.7604|-95.3698|America/Chicago
+Dallas|USA|32.7767|-96.7970|America/Chicago
+Phoenix|USA|33.4484|-112.0740|America/Phoenix
+Philadelphia|USA|39.9526|-75.1652|America/New_York
+San Francisco|USA|37.7749|-122.4194|America/Los_Angeles
+San Diego|USA|32.7157|-117.1611|America/Los_Angeles
+Seattle|USA|47.6062|-122.3321|America/Los_Angeles
+Las Vegas|USA|36.1699|-115.1398|America/Los_Angeles
+Denver|USA|39.7392|-104.9903|America/Denver
+Miami|USA|25.7617|-80.1918|America/New_York
+Boston|USA|42.3601|-71.0589|America/New_York
+Atlanta|USA|33.7490|-84.3880|America/New_York
+Washington, D.C.|USA|38.9072|-77.0369|America/New_York
+Honolulu|USA|21.3069|-157.8583|Pacific/Honolulu
+Anchorage|USA|61.2181|-149.9003|America/Anchorage
+Toronto|Kanada|43.6532|-79.3832|America/Toronto
+Montreal|Kanada|45.5017|-73.5673|America/Toronto
+Vancouver|Kanada|49.2827|-123.1207|America/Vancouver
+Mexiko-Stadt|Mexiko|19.4326|-99.1332|America/Mexico_City
+Havanna|Kuba|23.1136|-82.3666|America/Havana
+Panama-Stadt|Panama|8.9824|-79.5199|America/Panama
+San José|Costa Rica|9.9281|-84.0907|America/Costa_Rica
+# Südamerika
+São Paulo|Brasilien|-23.5505|-46.6333|America/Sao_Paulo
+Rio de Janeiro|Brasilien|-22.9068|-43.1729|America/Sao_Paulo
+Buenos Aires|Argentinien|-34.6037|-58.3816|America/Argentina/Buenos_Aires
+Santiago de Chile|Chile|-33.4489|-70.6693|America/Santiago
+Lima|Peru|-12.0464|-77.0428|America/Lima
+Bogotá|Kolumbien|4.7110|-74.0721|America/Bogota
+Caracas|Venezuela|10.4806|-66.9036|America/Caracas
+Montevideo|Uruguay|-34.9011|-56.1645|America/Montevideo
+Quito|Ecuador|-0.1807|-78.4678|America/Guayaquil
+La Paz|Bolivien|-16.4897|-68.1193|America/La_Paz
+# Asien
+Tokio|Japan|35.6762|139.6503|Asia/Tokyo
+Osaka|Japan|34.6937|135.5023|Asia/Tokyo
+Kyoto|Japan|35.0116|135.7681|Asia/Tokyo
+Naha (Okinawa)|Japan|26.2124|127.6809|Asia/Tokyo
+Peking|China|39.9042|116.4074|Asia/Shanghai
+Shanghai|China|31.2304|121.4737|Asia/Shanghai
+Hongkong|China|22.3193|114.1694|Asia/Hong_Kong
+Taipeh|Taiwan|25.0330|121.5654|Asia/Taipei
+Seoul|Südkorea|37.5665|126.9780|Asia/Seoul
+Singapur|Singapur|1.3521|103.8198|Asia/Singapore
+Bangkok|Thailand|13.7563|100.5018|Asia/Bangkok
+Hanoi|Vietnam|21.0278|105.8342|Asia/Ho_Chi_Minh
+Ho-Chi-Minh-Stadt|Vietnam|10.8231|106.6297|Asia/Ho_Chi_Minh
+Kuala Lumpur|Malaysia|3.1390|101.6869|Asia/Kuala_Lumpur
+Jakarta|Indonesien|-6.2088|106.8456|Asia/Jakarta
+Manila|Philippinen|14.5995|120.9842|Asia/Manila
+Neu-Delhi|Indien|28.6139|77.2090|Asia/Kolkata
+Mumbai|Indien|19.0760|72.8777|Asia/Kolkata
+Kalkutta|Indien|22.5726|88.3639|Asia/Kolkata
+Chennai|Indien|13.0827|80.2707|Asia/Kolkata
+Bengaluru|Indien|12.9716|77.5946|Asia/Kolkata
+Kathmandu|Nepal|27.7172|85.3240|Asia/Kathmandu
+Colombo|Sri Lanka|6.9271|79.8612|Asia/Colombo
+Dhaka|Bangladesch|23.8103|90.4125|Asia/Dhaka
+Karatschi|Pakistan|24.8607|67.0011|Asia/Karachi
+Lahore|Pakistan|31.5204|74.3587|Asia/Karachi
+Kabul|Afghanistan|34.5553|69.2075|Asia/Kabul
+Teheran|Iran|35.6892|51.3890|Asia/Tehran
+Bagdad|Irak|33.3152|44.3661|Asia/Baghdad
+Dubai|Vereinigte Arabische Emirate|25.2048|55.2708|Asia/Dubai
+Riad|Saudi-Arabien|24.7136|46.6753|Asia/Riyadh
+Jerusalem|Israel|31.7683|35.2137|Asia/Jerusalem
+Tel Aviv|Israel|32.0853|34.7818|Asia/Jerusalem
+Beirut|Libanon|33.8938|35.5018|Asia/Beirut
+Damaskus|Syrien|33.5138|36.2765|Asia/Damascus
+Tiflis|Georgien|41.7151|44.8271|Asia/Tbilisi
+Eriwan|Armenien|40.1792|44.4991|Asia/Yerevan
+Baku|Aserbaidschan|40.4093|49.8671|Asia/Baku
+Taschkent|Usbekistan|41.2995|69.2401|Asia/Tashkent
+Almaty|Kasachstan|43.2220|76.8512|Asia/Almaty
+Ulan-Bator|Mongolei|47.8864|106.9057|Asia/Ulaanbaatar
+Jekaterinburg|Russland|56.8389|60.6057|Asia/Yekaterinburg
+Nowosibirsk|Russland|55.0084|82.9357|Asia/Novosibirsk
+Wladiwostok|Russland|43.1155|131.8855|Asia/Vladivostok
+# Afrika
+Kairo|Ägypten|30.0444|31.2357|Africa/Cairo
+Alexandria|Ägypten|31.2001|29.9187|Africa/Cairo
+Lagos|Nigeria|6.5244|3.3792|Africa/Lagos
+Nairobi|Kenia|-1.2921|36.8219|Africa/Nairobi
+Johannesburg|Südafrika|-26.2041|28.0473|Africa/Johannesburg
+Kapstadt|Südafrika|-33.9249|18.4241|Africa/Johannesburg
+Casablanca|Marokko|33.5731|-7.5898|Africa/Casablanca
+Algier|Algerien|36.7538|3.0588|Africa/Algiers
+Tunis|Tunesien|36.8065|10.1815|Africa/Tunis
+Addis Abeba|Äthiopien|9.0300|38.7400|Africa/Addis_Ababa
+Accra|Ghana|5.6037|-0.1870|Africa/Accra
+Dakar|Senegal|14.7167|-17.4677|Africa/Dakar
+Kinshasa|DR Kongo|-4.4419|15.2663|Africa/Kinshasa
+Daressalam|Tansania|-6.7924|39.2083|Africa/Dar_es_Salaam
+# Ozeanien
+Sydney|Australien|-33.8688|151.2093|Australia/Sydney
+Melbourne|Australien|-37.8136|144.9631|Australia/Melbourne
+Brisbane|Australien|-27.4698|153.0251|Australia/Brisbane
+Perth|Australien|-31.9505|115.8605|Australia/Perth
+Adelaide|Australien|-34.9285|138.6007|Australia/Adelaide
+Canberra|Australien|-35.2809|149.1300|Australia/Sydney
+Auckland|Neuseeland|-36.8485|174.7633|Pacific/Auckland
+Wellington|Neuseeland|-41.2865|174.7762|Pacific/Auckland

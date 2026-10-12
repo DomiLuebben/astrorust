@@ -1,4 +1,5 @@
 pub mod analysis;
+pub mod astrocarto;
 pub mod aspects;
 pub mod atlas;
 pub mod calculator;
@@ -14,3 +15,4 @@ pub mod synastry;
 pub mod transits;
 pub mod tz;
 pub mod util;
+pub mod vedic;
