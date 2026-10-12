@@ -41,21 +41,21 @@ pub fn generate_chart_svg(chart: &ChartResponse) -> String {
 
     // Draw Zodiac Signs (12 slices)
     let signs = [
-        ("♈", "Widder", "#f87171"),
-        ("♉", "Stier", "#4ade80"),
-        ("♊", "Zwillinge", "#fbbf24"),
-        ("♋", "Krebs", "#60a5fa"),
-        ("♌", "Löwe", "#f87171"),
-        ("♍", "Jungfrau", "#4ade80"),
-        ("♎", "Waage", "#fbbf24"),
-        ("♏", "Skorpion", "#60a5fa"),
-        ("♐", "Schütze", "#f87171"),
-        ("♑", "Steinbock", "#4ade80"),
-        ("♒", "Wassermann", "#fbbf24"),
-        ("♓", "Fische", "#60a5fa"),
+        ("♈\u{FE0E}", "Widder", "#f87171"),
+        ("♉\u{FE0E}", "Stier", "#4ade80"),
+        ("♊\u{FE0E}", "Zwillinge", "#fbbf24"),
+        ("♋\u{FE0E}", "Krebs", "#60a5fa"),
+        ("♌\u{FE0E}", "Löwe", "#f87171"),
+        ("♍\u{FE0E}", "Jungfrau", "#4ade80"),
+        ("♎\u{FE0E}", "Waage", "#fbbf24"),
+        ("♏\u{FE0E}", "Skorpion", "#60a5fa"),
+        ("♐\u{FE0E}", "Schütze", "#f87171"),
+        ("♑\u{FE0E}", "Steinbock", "#4ade80"),
+        ("♒\u{FE0E}", "Wassermann", "#fbbf24"),
+        ("♓\u{FE0E}", "Fische", "#60a5fa"),
     ];
 
-    for i in 0..12 {
+    for (i, sign) in signs.iter().enumerate() {
         let start_deg = i as f64 * 30.0;
         let end_deg = (i + 1) as f64 * 30.0;
         let mid_deg = start_deg + 15.0;
@@ -85,7 +85,7 @@ pub fn generate_chart_svg(chart: &ChartResponse) -> String {
         let gx = cx + r_glyph * a_mid.cos();
         let gy = cy + r_glyph * a_mid.sin();
 
-        let (glyph, _, color) = signs[i];
+        let (glyph, _, color) = *sign;
         svg.push_str(&format!(
             r##"<text x="{:.1}" y="{:.1}" fill="{}" font-size="20" font-weight="bold" text-anchor="middle" dominant-baseline="central">{}</text>"##,
             gx, gy, color, glyph

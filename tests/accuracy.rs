@@ -9,6 +9,7 @@ fn angle_diff(a: f64, b: f64) -> f64 {
     ((a - b + 540.0).rem_euclid(360.0) - 180.0).abs()
 }
 
+#[allow(clippy::too_many_arguments)]
 fn request(year: i32, month: i32, day: i32, hour: u32, minute: u32, tz: f64, lat: f64, lon: f64) -> ChartRequest {
     ChartRequest {
         name: "Test".into(),
@@ -38,10 +39,10 @@ fn chiron_matches_jpl_horizons() {
     let refs = [
         (2344164.453333333, 264.1788711, 5.3618193),
         (2366078.986666667, 334.8037610, 5.2093485),
-        (2387993.520000000, 16.8295145, 1.0181650),
+        (2_387_993.52, 16.8295145, 1.0181650),
         (2409908.053333333, 72.1634275, -5.3273744),
         (2431822.586666666, 200.2395992, -1.7834995),
-        (2453737.120000000, 301.9694167, 6.4897658),
+        (2_453_737.12, 301.9694167, 6.4897658),
         (2475651.653333333, 346.4759606, 4.4514033),
         (2497566.186666667, 22.6973735, 0.5957978),
     ];
@@ -120,7 +121,7 @@ fn ffi_errors_are_valid_json() {
     let bad = CString::new(r#"{"name": "x", "year": "abc"}"#).unwrap();
     let ptr = astrorust_calculate_chart(bad.as_ptr());
     let text = unsafe { CStr::from_ptr(ptr).to_str().unwrap().to_string() };
-    astrorust_free_string(ptr);
+    unsafe { astrorust_free_string(ptr) };
     let value: serde_json::Value = serde_json::from_str(&text).expect("Antwort muss gültiges JSON sein");
     assert!(value["error"].as_str().unwrap().contains("JSON Parse Error"));
 }

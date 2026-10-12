@@ -44,7 +44,7 @@ fn parse_curated() -> Vec<CityEntry> {
 
 /// "+4852+01107" bzw. "+485230+0110730" → (lat, lon)
 fn parse_iso6709(s: &str) -> Option<(f64, f64)> {
-    let split = s[1..].find(|c| c == '+' || c == '-')? + 1;
+    let split = s[1..].find(['+', '-'])? + 1;
     let (lat_s, lon_s) = s.split_at(split);
     let conv = |t: &str, deg_digits: usize| -> Option<f64> {
         let sign = if t.starts_with('-') { -1.0 } else { 1.0 };

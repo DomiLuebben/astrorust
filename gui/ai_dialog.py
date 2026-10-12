@@ -12,12 +12,13 @@ from PyQt6.QtWidgets import (
 
 from ai_engine import AiConfig, detect_environment
 import styles
+from i18n import tr
 
 
 class AiSettingsDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("KI-Deutung — Provider & API-Keys")
+        self.setWindowTitle(tr("KI-Deutung — Provider & API-Keys"))
         self.setMinimumWidth(620)
         self.setStyleSheet(styles.DARK_STYLESHEET)
 
@@ -32,7 +33,7 @@ class AiSettingsDialog(QDialog):
         layout.setSpacing(14)
 
         # 1. Erkannte lokale KI-Agenten Infobox
-        box_detected = QGroupBox("Erkannte lokale KI-Dienste")
+        box_detected = QGroupBox(tr("Erkannte lokale KI-Dienste"))
         l_det = QVBoxLayout(box_detected)
 
         claude_status = "✔ Gefunden (~/.local/bin/claude)" if self.env["claude_cli"] else "✘ Nicht im Pfad"
@@ -53,24 +54,24 @@ class AiSettingsDialog(QDialog):
         layout.addWidget(box_detected)
 
         # 2. Provider Auswahl
-        box_prov = QGroupBox("Aktiver Provider")
+        box_prov = QGroupBox(tr("Aktiver Provider"))
         l_prov = QGridLayout(box_prov)
         l_prov.setSpacing(8)
 
-        l_prov.addWidget(QLabel("Bevorzugter Dienst:"), 0, 0)
+        l_prov.addWidget(QLabel(tr("Bevorzugter Dienst:")), 0, 0)
         self.combo_provider = QComboBox()
-        self.combo_provider.addItem("Automatische Erkennung (Auto-Detect: Lokale CLIs > API-Keys)", "auto")
+        self.combo_provider.addItem(tr("Automatische Erkennung (Auto-Detect: Lokale CLIs > API-Keys)"), "auto")
         if self.env["claude_cli"]:
-            self.combo_provider.addItem("⚡ Claude Code CLI (Lokal ohne Key)", "claude_cli")
+            self.combo_provider.addItem(tr("⚡ Claude Code CLI (Lokal ohne Key)"), "claude_cli")
         if self.env["codex_cli"]:
-            self.combo_provider.addItem("⚡ Codex CLI (Lokal)", "codex_cli")
-        self.combo_provider.addItem("🦙 Ollama (Lokal)", "ollama")
-        self.combo_provider.addItem("🔑 Google Gemini API", "gemini")
-        self.combo_provider.addItem("🔑 Anthropic (Claude API)", "anthropic")
-        self.combo_provider.addItem("🔑 OpenAI (GPT API)", "openai")
-        self.combo_provider.addItem("🔑 DeepSeek API", "deepseek")
-        self.combo_provider.addItem("🔑 OpenRouter API", "openrouter")
-        self.combo_provider.addItem("🌐 Eigener Endpoint (OpenAI-kompatibel / LM Studio / vLLM)", "custom")
+            self.combo_provider.addItem(tr("⚡ Codex CLI (Lokal)"), "codex_cli")
+        self.combo_provider.addItem(tr("🦙 Ollama (Lokal)"), "ollama")
+        self.combo_provider.addItem(tr("🔑 Google Gemini API"), "gemini")
+        self.combo_provider.addItem(tr("🔑 Anthropic (Claude API)"), "anthropic")
+        self.combo_provider.addItem(tr("🔑 OpenAI (GPT API)"), "openai")
+        self.combo_provider.addItem(tr("🔑 DeepSeek API"), "deepseek")
+        self.combo_provider.addItem(tr("🔑 OpenRouter API"), "openrouter")
+        self.combo_provider.addItem(tr("🌐 Eigener Endpoint (OpenAI-kompatibel / LM Studio / vLLM)"), "custom")
 
         l_prov.addWidget(self.combo_provider, 0, 1)
         layout.addWidget(box_prov)
@@ -84,12 +85,12 @@ class AiSettingsDialog(QDialog):
         l_cloud.setSpacing(10)
 
         # Header
-        l_cloud.addWidget(QLabel("<b>Provider</b>"), 0, 0)
-        l_cloud.addWidget(QLabel("<b>API-Key</b>"), 0, 1)
-        l_cloud.addWidget(QLabel("<b>Modell</b>"), 0, 2)
+        l_cloud.addWidget(QLabel(tr("<b>Provider</b>")), 0, 0)
+        l_cloud.addWidget(QLabel(tr("<b>API-Key</b>")), 0, 1)
+        l_cloud.addWidget(QLabel(tr("<b>Modell</b>")), 0, 2)
 
         # Google Gemini
-        l_cloud.addWidget(QLabel("Google Gemini:"), 1, 0)
+        l_cloud.addWidget(QLabel(tr("Google Gemini:")), 1, 0)
         self.edit_key_gemini = self._create_password_edit("AIzaSy...")
         self.edit_model_gemini = QLineEdit()
         self.edit_model_gemini.setPlaceholderText("gemini-2.5-pro")
@@ -97,7 +98,7 @@ class AiSettingsDialog(QDialog):
         l_cloud.addWidget(self.edit_model_gemini, 1, 2)
 
         # Anthropic Claude
-        l_cloud.addWidget(QLabel("Anthropic (Claude):"), 2, 0)
+        l_cloud.addWidget(QLabel(tr("Anthropic (Claude):")), 2, 0)
         self.edit_key_anthropic = self._create_password_edit("sk-ant-...")
         self.edit_model_anthropic = QLineEdit()
         self.edit_model_anthropic.setPlaceholderText("claude-sonnet-5-5")
@@ -105,7 +106,7 @@ class AiSettingsDialog(QDialog):
         l_cloud.addWidget(self.edit_model_anthropic, 2, 2)
 
         # OpenAI
-        l_cloud.addWidget(QLabel("OpenAI (GPT):"), 3, 0)
+        l_cloud.addWidget(QLabel(tr("OpenAI (GPT):")), 3, 0)
         self.edit_key_openai = self._create_password_edit("sk-proj-...")
         self.edit_model_openai = QLineEdit()
         self.edit_model_openai.setPlaceholderText("gpt-4o")
@@ -113,7 +114,7 @@ class AiSettingsDialog(QDialog):
         l_cloud.addWidget(self.edit_model_openai, 3, 2)
 
         # DeepSeek
-        l_cloud.addWidget(QLabel("DeepSeek:"), 4, 0)
+        l_cloud.addWidget(QLabel(tr("DeepSeek:")), 4, 0)
         self.edit_key_deepseek = self._create_password_edit("sk-...")
         self.edit_model_deepseek = QLineEdit()
         self.edit_model_deepseek.setPlaceholderText("deepseek-chat")
@@ -121,48 +122,48 @@ class AiSettingsDialog(QDialog):
         l_cloud.addWidget(self.edit_model_deepseek, 4, 2)
 
         # OpenRouter
-        l_cloud.addWidget(QLabel("OpenRouter:"), 5, 0)
+        l_cloud.addWidget(QLabel(tr("OpenRouter:")), 5, 0)
         self.edit_key_openrouter = self._create_password_edit("sk-or-...")
         self.edit_model_openrouter = QLineEdit()
         self.edit_model_openrouter.setPlaceholderText("deepseek/deepseek-chat")
         l_cloud.addLayout(self.edit_key_openrouter["layout"], 5, 1)
         l_cloud.addWidget(self.edit_model_openrouter, 5, 2)
 
-        tab_widget.addTab(tab_cloud, "🔑 Cloud API-Keys")
+        tab_widget.addTab(tab_cloud, tr("🔑 Cloud API-Keys"))
 
         # Tab Lokale Server
         tab_local = QWidget()
         l_local = QGridLayout(tab_local)
         l_local.setSpacing(10)
 
-        l_local.addWidget(QLabel("<b>Dienst</b>"), 0, 0)
-        l_local.addWidget(QLabel("<b>Server-URL</b>"), 0, 1)
-        l_local.addWidget(QLabel("<b>Modell</b>"), 0, 2)
+        l_local.addWidget(QLabel(tr("<b>Dienst</b>")), 0, 0)
+        l_local.addWidget(QLabel(tr("<b>Server-URL</b>")), 0, 1)
+        l_local.addWidget(QLabel(tr("<b>Modell</b>")), 0, 2)
 
-        l_local.addWidget(QLabel("Ollama:"), 1, 0)
+        l_local.addWidget(QLabel(tr("Ollama:")), 1, 0)
         self.edit_ollama_url = QLineEdit()
         self.edit_ollama_model = QLineEdit()
         l_local.addWidget(self.edit_ollama_url, 1, 1)
         l_local.addWidget(self.edit_ollama_model, 1, 2)
 
-        l_local.addWidget(QLabel("Custom Endpoint:"), 2, 0)
+        l_local.addWidget(QLabel(tr("Custom Endpoint:")), 2, 0)
         self.edit_custom_url = QLineEdit()
         self.edit_custom_model = QLineEdit()
         l_local.addWidget(self.edit_custom_url, 2, 1)
         l_local.addWidget(self.edit_custom_model, 2, 2)
 
-        tab_widget.addTab(tab_local, "🌐 Lokale Server / Ollama")
+        tab_widget.addTab(tab_local, tr("🌐 Lokale Server / Ollama"))
         layout.addWidget(tab_widget)
 
         # 4. Buttons
         h_btn = QHBoxLayout()
         h_btn.addStretch()
 
-        btn_cancel = QPushButton("Abbrechen")
+        btn_cancel = QPushButton(tr("Abbrechen"))
         btn_cancel.clicked.connect(self.reject)
         h_btn.addWidget(btn_cancel)
 
-        btn_save = QPushButton("Speichern & Schließen")
+        btn_save = QPushButton(tr("Speichern & Schließen"))
         btn_save.setObjectName("btn_start")
         btn_save.clicked.connect(self._save_and_close)
         h_btn.addWidget(btn_save)
@@ -178,9 +179,9 @@ class AiSettingsDialog(QDialog):
         edit.setEchoMode(QLineEdit.EchoMode.Password)
         edit.setPlaceholderText(placeholder)
 
-        btn_toggle = QPushButton("👁")
+        btn_toggle = QPushButton(tr("👁"))
         btn_toggle.setFixedWidth(30)
-        btn_toggle.setToolTip("Passwort anzeigen/verbergen")
+        btn_toggle.setToolTip(tr("Passwort anzeigen/verbergen"))
 
         def toggle():
             if edit.echoMode() == QLineEdit.EchoMode.Password:

@@ -406,7 +406,7 @@ pub fn resolve_local(zone_name: &str, local_secs: i64) -> Result<TzInfo, String>
     // Kandidaten: alle Offsets, die im Umfeld (±2 Tage) gelten können
     let mut offsets: Vec<i32> = Vec::new();
     for probe in [-172800i64, -86400, 0, 86400, 172800] {
-        let t = zone.type_at_utc(local_secs + probe - 0);
+        let t = zone.type_at_utc(local_secs + probe);
         if !offsets.contains(&t.utoff) {
             offsets.push(t.utoff);
         }

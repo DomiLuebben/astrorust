@@ -25,6 +25,7 @@ class RustBackend:
             os.path.join(base_dir, "target", "debug", "libastrorust.so"),
             os.path.join(base_dir, "target", "release", "libastrorust.so"),
             os.path.join(base_dir, "libastrorust.so"),
+            os.path.abspath(os.path.join(base_dir, "..", "..", "lib", "libastrorust.so")),
             "/usr/lib/libastrorust.so",
             "/usr/lib/astrorust/libastrorust.so",
             "/usr/local/lib/libastrorust.so",
@@ -35,9 +36,12 @@ class RustBackend:
         existing = [p for p in candidates if os.path.exists(p)]
         lib_path = None
         if existing:
-            project_builds = [p for p in existing if p.startswith(base_dir)]
-            pool = project_builds or existing
-            lib_path = max(pool, key=os.path.getmtime)
+            project_builds = [p for p in candidates[:2] if p in existing]
+            lib_path = (max(project_builds, key=os.path.getmtime)
+                        if project_builds else existing[0])
+        override = os.environ.get("ASTRORUST_LIBRARY")
+        if override:
+            lib_path = override if os.path.isfile(override) else None
 
         if not lib_path:
             raise RuntimeError(
@@ -64,6 +68,9 @@ class RustBackend:
 
         self.lib.astrorust_export_svg.argtypes = [ctypes.c_char_p]
         self.lib.astrorust_export_svg.restype = ctypes.c_void_p
+
+        self.lib.astrorust_call.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
+        self.lib.astrorust_call.restype = ctypes.c_void_p
 
         self.lib.astrorust_free_string.argtypes = [ctypes.c_void_p]
         self.lib.astrorust_free_string.restype = None
@@ -95,6 +102,21 @@ class RustBackend:
             raise ValueError(data["error"])
         return data
 
+    def call(self, method: str, req: dict | None = None):
+        """Allgemeiner Aufruf der Rust-Bibliothek (`astrorust_call`); wirft ValueError bei {"error": ...}."""
+        payload = json.dumps(req if req is not None else {}).encode("utf-8")
+        raw_ptr = self.lib.astrorust_call(method.encode("utf-8"), payload)
+        if not raw_ptr:
+            raise RuntimeError("Die Rust-Bibliothek lieferte keine Antwort.")
+        try:
+            text = ctypes.string_at(raw_ptr).decode("utf-8", errors="replace")
+        finally:
+            self.lib.astrorust_free_string(raw_ptr)
+        data = json.loads(text)
+        if isinstance(data, dict) and "error" in data and len(data) == 1:
+            raise ValueError(data["error"])
+        return data
+
     def calculate_chart(self, req_dict: dict) -> dict:
         return self._call_json(self.lib.astrorust_calculate_chart, req_dict)
 
@@ -109,8 +131,7 @@ class RustBackend:
         return json.loads(res_str)
 
     def search_cities(self, query: str = "") -> list:
-        res_str = self._call_c_func(self.lib.astrorust_search_cities, query)
-        return json.loads(res_str)
+        return self.call("atlas_search", {"query": query})
 
     def export_svg(self, req_dict: dict) -> str:
         # Die Bibliothek liefert den SVG-Text als JSON-String, Fehler als {"error": ...}.

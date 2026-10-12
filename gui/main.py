@@ -14,14 +14,19 @@ if current_dir not in sys.path:
 
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QIcon
-from mainwindow import MainWindow
+from appsettings import AppSettings
+import i18n
 import styles
 
 
 def main():
+    settings = AppSettings.load()
+    i18n.set_language(settings.language)
+    from mainwindow import MainWindow  # erst nach der Sprachwahl importieren (tr() läuft schon beim Aufbau)
+
     app = QApplication(sys.argv)
     app.setApplicationName("Astrorust")
-    app.setApplicationVersion("1.0.1")
+    app.setApplicationVersion("1.1.0")
     app.setOrganizationName("Astrorust")
     app.setDesktopFileName("astrorust")
 
@@ -33,7 +38,7 @@ def main():
     if os.path.exists(icon_path):
         app.setWindowIcon(QIcon(icon_path))
 
-    window = MainWindow()
+    window = MainWindow(settings)
     window.show()
 
     sys.exit(app.exec())

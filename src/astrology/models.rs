@@ -253,18 +253,18 @@ impl ZodiacSign {
 
     pub fn glyph(&self) -> &'static str {
         match self {
-            ZodiacSign::Aries => "♈",
-            ZodiacSign::Taurus => "♉",
-            ZodiacSign::Gemini => "♊",
-            ZodiacSign::Cancer => "♋",
-            ZodiacSign::Leo => "♌",
-            ZodiacSign::Virgo => "♍",
-            ZodiacSign::Libra => "♎",
-            ZodiacSign::Scorpio => "♏",
-            ZodiacSign::Sagittarius => "♐",
-            ZodiacSign::Capricorn => "♑",
-            ZodiacSign::Aquarius => "♒",
-            ZodiacSign::Pisces => "♓",
+            ZodiacSign::Aries => "♈\u{FE0E}",
+            ZodiacSign::Taurus => "♉\u{FE0E}",
+            ZodiacSign::Gemini => "♊\u{FE0E}",
+            ZodiacSign::Cancer => "♋\u{FE0E}",
+            ZodiacSign::Leo => "♌\u{FE0E}",
+            ZodiacSign::Virgo => "♍\u{FE0E}",
+            ZodiacSign::Libra => "♎\u{FE0E}",
+            ZodiacSign::Scorpio => "♏\u{FE0E}",
+            ZodiacSign::Sagittarius => "♐\u{FE0E}",
+            ZodiacSign::Capricorn => "♑\u{FE0E}",
+            ZodiacSign::Aquarius => "♒\u{FE0E}",
+            ZodiacSign::Pisces => "♓\u{FE0E}",
         }
     }
 

@@ -168,7 +168,7 @@ fn varga_sign(division: u32, lon: f64) -> usize {
     let lon = lon.rem_euclid(360.0);
     let sign = (lon / 30.0).floor() as usize % 12;
     let d = lon - sign as f64 * 30.0;
-    let odd = sign % 2 == 0; // Widder (0) ist ein ungerades Zeichen
+    let odd = sign.is_multiple_of(2); // Widder (0) ist ein ungerades Zeichen
     match division {
         1 => sign,
         3 => {

@@ -236,3 +236,44 @@ fn graphic_ephemeris_wraps_on_the_90_degree_dial() {
     assert!(g.series[0].dial.iter().all(|d| (0.0..90.0).contains(d)));
     assert!(!g.natal_lines.is_empty());
 }
+
+#[test]
+fn invalid_forecast_dates_are_rejected() {
+    let mut bad = tp(2024, 2, 30);
+    assert!(bad.checked_jd_ut().is_err());
+    bad = tp(2024, 13, 1);
+    assert!(calculate_progression(&ProgressionRequest {
+        natal: natal(), target: bad, kind: "secondary".into(), orb: 1.0,
+    }).is_err());
+}
+
+#[test]
+fn displayed_event_time_rolls_to_next_day() {
+    let jd = astrorust::astrology::util::julian_day_ut(2024, 12, 31, 23.0 + 59.0 / 60.0 + 50.0 / 3600.0);
+    assert_eq!(format_jd(jd, None), "2025-01-01 00:00 UTC");
+    let historic = astrorust::astrology::util::julian_day_ut(1452, 4, 15, 12.0);
+    assert_eq!(format_jd(historic, None), "1452-04-15 12:00 UTC");
+}
+
+#[test]
+fn topocentric_moon_and_relocated_return_use_the_observer() {
+    use astrorust::astrology::engine;
+    let mut n = natal();
+    let geocentric = calculate_chart(&n).unwrap();
+    n.settings = Some(ChartSettings { topocentric: true, ..Default::default() });
+    let topocentric = calculate_chart(&n).unwrap();
+    assert!(diff(lon(&geocentric, CelestialPoint::Moon), lon(&topocentric, CelestialPoint::Moon)) > 0.05);
+    {
+        let _guard = engine::lock();
+        sweph::set_topocentric(n.longitude, n.latitude, 0.0);
+        let expected = sweph::calc_with(topocentric.julian_day, sweph::Body::Moon,
+            sweph::Flags::SWISS | sweph::Flags::TOPOCENTRIC | sweph::Flags::EQUATORIAL).unwrap();
+        let moon = topocentric.planets.iter().find(|p| p.id == CelestialPoint::Moon).unwrap();
+        assert!((moon.declination - expected.latitude).abs() < 1e-8);
+    }
+    let r = calculate_return(&ReturnRequest {
+        natal: n, body: "Moon".into(), start: tp(2024, 1, 1), count: 1,
+        latitude: Some(-33.86), longitude: Some(151.21), location_name: Some("Sydney".into()), display_timezone: None,
+    }).unwrap();
+    assert!(diff(lon(&r.chart, CelestialPoint::Moon), lon(&topocentric, CelestialPoint::Moon)) < 1e-4);
+}

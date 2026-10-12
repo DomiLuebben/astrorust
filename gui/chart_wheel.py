@@ -11,6 +11,7 @@ from PyQt6.QtGui import (
 from PyQt6.QtWidgets import QWidget, QToolTip
 
 import styles
+from i18n import tr
 
 
 class ChartWheelWidget(QWidget):
@@ -25,14 +26,20 @@ class ChartWheelWidget(QWidget):
         self.transit_data = None
         self.mode = "radix"  # "radix", "transit", "synastry"
 
+        self.cross_aspects = []
+        self.outer_label = ""
         self.hovered_planet = None
         self.selected_planet = None
         self.hit_zones = []
+        self.outer_zones = []
 
-    def set_data(self, chart_data, transit_data=None, mode="radix"):
+    def set_data(self, chart_data, transit_data=None, mode="radix", cross_aspects=None, outer_label=""):
         self.chart_data = chart_data
         self.transit_data = transit_data
         self.mode = mode
+        self.cross_aspects = cross_aspects or []
+        self.outer_label = outer_label
+        self.hovered_planet = None
         self.update()
 
     def screen_angle(self, lon, asc):
@@ -44,20 +51,29 @@ class ChartWheelWidget(QWidget):
 
     def paintEvent(self, event):
         painter = QPainter(self)
+        self.paint_wheel(painter, QRectF(self.rect()))
+
+    def paint_wheel(self, painter, rect, background=True):
+        """Zeichnet das Rad in `rect` (auch für PDF/Bild-Export nutzbar)."""
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setRenderHint(QPainter.RenderHint.TextAntialiasing)
+        painter.save()
+        painter.translate(rect.topLeft())
+        self.outer_zones = []
+        w = rect.width()
+        h = rect.height()
+        target = QRectF(0, 0, w, h)
 
-        # Clear background
-        painter.fillRect(self.rect(), QColor(styles.WINDOW))
+        if background:
+            painter.fillRect(target, QColor(styles.WINDOW))
 
         if not self.chart_data:
             painter.setPen(QColor(styles.TEXT_MUTED))
             painter.setFont(QFont("sans-serif", 13))
-            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "Bereit — Klicken Sie auf „Berechnen“")
+            painter.drawText(target, Qt.AlignmentFlag.AlignCenter, tr("Bereit — Klicken Sie auf „Berechnen“"))
+            painter.restore()
             return
 
-        w = self.width()
-        h = self.height()
         size = min(w, h) - 20
         cx = w / 2.0
         cy = h / 2.0
@@ -95,6 +111,8 @@ class ChartWheelWidget(QWidget):
 
         # 5. Draw Aspects in central wheel
         self._draw_aspects(painter, cx, cy, r_aspects, asc)
+        if is_bi_wheel and self.cross_aspects:
+            self._draw_cross_aspects(painter, cx, cy, r_aspects, asc)
 
         # 6. Draw Natal Planets with anti-collision spread
         self._draw_planets(painter, cx, cy, r_house_in + 23, asc)
@@ -107,20 +125,26 @@ class ChartWheelWidget(QWidget):
         painter.setPen(QColor(styles.ACCENT))
         painter.drawText(QRectF(cx - 18, cy - 18, 36, 36), Qt.AlignmentFlag.AlignCenter, "✦")
 
+        if is_bi_wheel and self.outer_label:
+            painter.setFont(QFont("sans-serif", 9))
+            painter.setPen(QColor(styles.TEXT_MUTED))
+            painter.drawText(QRectF(10, 6, w - 20, 18), Qt.AlignmentFlag.AlignLeft, tr("Außenring: ") + self.outer_label)
+        painter.restore()
+
     def _draw_zodiac_ring(self, painter, cx, cy, r_out, r_in, asc):
         signs = [
-            ("♈", "Widder", styles.COLOR_FIRE),
-            ("♉", "Stier", styles.COLOR_EARTH),
-            ("♊", "Zwillinge", styles.COLOR_AIR),
-            ("♋", "Krebs", styles.COLOR_WATER),
-            ("♌", "Löwe", styles.COLOR_FIRE),
-            ("♍", "Jungfrau", styles.COLOR_EARTH),
-            ("♎", "Waage", styles.COLOR_AIR),
-            ("♏", "Skorpion", styles.COLOR_WATER),
-            ("♐", "Schütze", styles.COLOR_FIRE),
-            ("♑", "Steinbock", styles.COLOR_EARTH),
-            ("♒", "Wassermann", styles.COLOR_AIR),
-            ("♓", "Fische", styles.COLOR_WATER),
+            ("♈\uFE0E", "Widder", styles.COLOR_FIRE),
+            ("♉\uFE0E", "Stier", styles.COLOR_EARTH),
+            ("♊\uFE0E", "Zwillinge", styles.COLOR_AIR),
+            ("♋\uFE0E", "Krebs", styles.COLOR_WATER),
+            ("♌\uFE0E", "Löwe", styles.COLOR_FIRE),
+            ("♍\uFE0E", "Jungfrau", styles.COLOR_EARTH),
+            ("♎\uFE0E", "Waage", styles.COLOR_AIR),
+            ("♏\uFE0E", "Skorpion", styles.COLOR_WATER),
+            ("♐\uFE0E", "Schütze", styles.COLOR_FIRE),
+            ("♑\uFE0E", "Steinbock", styles.COLOR_EARTH),
+            ("♒\uFE0E", "Wassermann", styles.COLOR_AIR),
+            ("♓\uFE0E", "Fische", styles.COLOR_WATER),
         ]
 
         painter.setPen(QPen(QColor(styles.BORDER), 1.0))
@@ -335,54 +359,113 @@ class ChartWheelWidget(QWidget):
                 painter.setPen(QColor(styles.STOP_RED))
                 painter.drawText(QRectF(px + 6, py - 12, 12, 12), Qt.AlignmentFlag.AlignCenter, "℞")
 
+    def _spread(self, longitudes, asc, min_spacing=0.11):
+        """Verteilt dicht beieinander stehende Glyphen auf dem Kreis (Winkel in rad)."""
+        items = [{"i": i, "raw": self.screen_angle(lon, asc)} for i, lon in enumerate(longitudes)]
+        for it in items:
+            it["draw"] = it["raw"]
+        items.sort(key=lambda x: x["raw"])
+        n = len(items)
+        for _ in range(10):
+            for k in range(n):
+                nxt = items[(k + 1) % n]
+                cur = items[k]
+                diff = nxt["draw"] - cur["draw"]
+                if diff < 0:
+                    diff += math.tau
+                if n > 1 and diff < min_spacing:
+                    shift = (min_spacing - diff) / 2.0
+                    cur["draw"] -= shift
+                    nxt["draw"] += shift
+        return items
+
     def _draw_transit_ring(self, painter, cx, cy, r_out, r_in, asc):
-        transit_planets = self.transit_data.get("planets", [])
+        outer = self.transit_data.get("planets", [])
         painter.setPen(QPen(QColor(styles.ACCENT_DARK), 1.0))
         painter.drawEllipse(QPointF(cx, cy), r_out, r_out)
 
         r_mid = (r_out + r_in) / 2.0
-        for p in transit_planets:
-            a = self.screen_angle(p["longitude"], asc)
+        self.outer_zones = []
+        for it in self._spread([p["longitude"] for p in outer], asc, 0.095):
+            p = outer[it["i"]]
+            a = it["draw"]
             px = cx + r_mid * math.cos(a)
             py = cy + r_mid * math.sin(a)
+            self.outer_zones.append({"planet": p, "x": px, "y": py, "radius": 11})
+
+            raw = it["raw"]
+            painter.setPen(QPen(QColor(styles.BORDER), 0.8))
+            painter.drawLine(QPointF(cx + r_in * math.cos(raw), cy + r_in * math.sin(raw)),
+                             QPointF(cx + (r_in + 4) * math.cos(raw), cy + (r_in + 4) * math.sin(raw)))
 
             painter.setBrush(QBrush(QColor(styles.SURFACE_SUNKEN)))
             painter.setPen(QPen(QColor(styles.ACCENT), 1.2))
             painter.drawEllipse(QPointF(px, py), 9, 9)
-
-            glyph = p.get("glyph", "•")
             painter.setFont(QFont("serif", 9, QFont.Weight.Bold))
             painter.setPen(QColor(styles.ACCENT))
-            painter.drawText(QRectF(px - 9, py - 9, 18, 18), Qt.AlignmentFlag.AlignCenter, glyph)
+            painter.drawText(QRectF(px - 9, py - 9, 18, 18), Qt.AlignmentFlag.AlignCenter, p.get("glyph", "•"))
+            if p.get("is_retrograde"):
+                painter.setFont(QFont("sans-serif", 6, QFont.Weight.Bold))
+                painter.setPen(QColor(styles.STOP_RED))
+                painter.drawText(QRectF(px + 5, py - 11, 10, 10), Qt.AlignmentFlag.AlignCenter, "℞")
+
+    def _draw_cross_aspects(self, painter, cx, cy, r_aspects, asc):
+        """Gestrichelte Linien zwischen Außenring (Transit/Partner/Progression) und Radix."""
+        outer = {p["id"]: p for p in self.transit_data.get("planets", [])}
+        inner = {p["id"]: p for p in self.chart_data.get("planets", [])}
+        angles = self.chart_data.get("angles", {})
+        inner["Ascendant"] = {"longitude": angles.get("ascendant", 0.0)}
+        inner["Midheaven"] = {"longitude": angles.get("midheaven", 0.0)}
+        for asp in self.cross_aspects:
+            p1 = outer.get(asp.get("transit_point"))
+            p2 = inner.get(asp.get("natal_point"))
+            if not p1 or not p2:
+                continue
+            a1 = self.screen_angle(p1["longitude"], asc)
+            a2 = self.screen_angle(p2["longitude"], asc)
+            col = QColor(asp.get("color_hex", styles.ACCENT))
+            col.setAlpha(170 if asp.get("orb", 9) <= 1.0 else 90)
+            pen = QPen(col, 1.2)
+            pen.setStyle(Qt.PenStyle.DashLine)
+            painter.setPen(pen)
+            painter.drawLine(QPointF(cx + r_aspects * math.cos(a1), cy + r_aspects * math.sin(a1)),
+                             QPointF(cx + r_aspects * math.cos(a2), cy + r_aspects * math.sin(a2)))
 
     def mouseMoveEvent(self, event):
         pos = event.position()
-        mx = pos.x()
-        my = pos.y()
+        mx, my = pos.x(), pos.y()
 
         hit = None
         for z in self.hit_zones:
-            dx = mx - z["x"]
-            dy = my - z["y"]
-            if math.hypot(dx, dy) <= z["radius"]:
+            if math.hypot(mx - z["x"], my - z["y"]) <= z["radius"]:
                 hit = z["planet"]
                 break
+        outer_hit = None
+        if hit is None:
+            for z in self.outer_zones:
+                if math.hypot(mx - z["x"], my - z["y"]) <= z["radius"]:
+                    outer_hit = z["planet"]
+                    break
 
-        if hit != self.hovered_planet:
+        key = (hit.get("id") if hit else None, outer_hit.get("id") if outer_hit else None)
+        if key != getattr(self, "_last_hover_key", None):
+            self._last_hover_key = key
             self.hovered_planet = hit
             self.update()
 
-            if hit:
+            target = hit or outer_hit
+            if target:
                 self.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-                tip_text = (
-                    f"<b>{hit.get('glyph')} {hit.get('name')}</b><br>"
-                    f"Position: {hit.get('formatted_deg')} in {hit.get('sign_name')} ({hit.get('sign_glyph')})<br>"
-                    f"Haus: {hit.get('house')}. Haus<br>"
-                    f"{'Rückläufig ℞<br>' if hit.get('is_retrograde') else ''}"
-                    f"{'Würde: ' + hit.get('dignity') + '<br>' if hit.get('dignity') else ''}"
-                    f"Geschwindigkeit: {hit.get('speed', 0.0):.3f}°/Tag"
+                prefix = (self.outer_label + ": ") if outer_hit and self.outer_label else ""
+                tip = (
+                    f"<b>{prefix}{target.get('glyph')} {target.get('name')}</b><br>"
+                    f"{tr('Position')}: {target.get('formatted_deg')} {tr('in')} {target.get('sign_name')} ({target.get('sign_glyph')})<br>"
+                    f"{tr('Haus')}: {target.get('house')}.<br>"
+                    f"{(tr('Rückläufig') + ' ℞<br>') if target.get('is_retrograde') else ''}"
+                    f"{(tr('Würde') + ': ' + target.get('dignity') + '<br>') if target.get('dignity') else ''}"
+                    f"{tr('Geschwindigkeit')}: {target.get('speed', 0.0):.3f}°/{tr('Tag')}"
                 )
-                QToolTip.showText(self.mapToGlobal(event.pos()), tip_text, self)
+                QToolTip.showText(self.mapToGlobal(event.pos()), tip, self)
             else:
                 self.setCursor(QCursor(Qt.CursorShape.ArrowCursor))
                 QToolTip.hideText()

@@ -38,6 +38,17 @@ impl TimePoint {
     pub fn jd_ut(&self) -> f64 {
         julian_day_ut(self.year, self.month, self.day, self.hour as f64 + self.minute as f64 / 60.0 - self.timezone_offset)
     }
+
+    pub fn checked_jd_ut(&self) -> Result<f64, String> {
+        let request = ChartRequest {
+            name: String::new(), year: self.year, month: self.month, day: self.day,
+            hour: self.hour, minute: self.minute, second: Some(0),
+            timezone_offset: self.timezone_offset, latitude: 0.0, longitude: 0.0,
+            location_name: None, house_system: None, timezone: None, settings: None,
+        };
+        crate::astrology::util::validate_request(&request)?;
+        Ok(self.jd_ut())
+    }
 }
 
 /// Formatiert einen UT-JD als Ortszeit der Anzeigezone (oder UTC).
@@ -50,10 +61,11 @@ pub fn format_jd(jd_ut: f64, zone: Option<&str>) -> String {
             tag = format!("UTC{}{:02}:{:02}", if o < 0.0 { '-' } else { '+' }, o.abs().floor() as i32, ((o.abs() - o.abs().floor()) * 60.0).round() as i32);
         }
     }
-    let d = sweph::date_from_julian_day(jd_ut + offset / 24.0);
-    let h = d.hour.floor();
-    let m = ((d.hour - h) * 60.0).round() as u32;
-    let (h, m) = if m == 60 { (h as u32 + 1, 0) } else { (h as u32, m) };
+    // Round before converting the date so 23:59:40 rolls into the next day.
+    let rounded = ((jd_ut + offset / 24.0) * 1440.0).round() / 1440.0;
+    let d = engine::calendar_date(rounded);
+    let minutes = (d.hour * 60.0).round() as u32;
+    let (h, m) = (minutes / 60, minutes % 60);
     format!("{:04}-{:02}-{:02} {:02}:{:02} {}", d.year, d.month, d.day, h, m, tag)
 }
 
@@ -67,9 +79,14 @@ fn lon_at(pt: CelestialPoint, jd: f64, settings: &ChartSettings) -> Result<(f64,
 }
 
 /// Setzt den Sidereal-Modus für die Dauer einer Prognoserechnung.
-fn prepare(settings: &ChartSettings) {
+fn prepare(settings: &ChartSettings, observer: Option<&ChartRequest>) {
     if settings.zodiac == Zodiac::Sidereal {
         engine::set_sidereal(settings.ayanamsa);
+    }
+    if settings.topocentric {
+        if let Some(r) = observer {
+            sweph::set_topocentric(r.longitude, r.latitude, 0.0);
+        }
     }
 }
 
@@ -169,14 +186,14 @@ pub fn calculate_progression(req: &ProgressionRequest) -> Result<ProgressionResp
     let natal = calculate_chart(&req.natal)?;
     let (natal_jd, _, _) = resolve_time(&req.natal)?;
     let settings = settings_of(&req.natal);
-    let target_jd = req.target.jd_ut();
+    let target_jd = req.target.checked_jd_ut()?;
     if target_jd < natal_jd {
         return Err("Der Prognosezeitpunkt liegt vor der Geburt.".into());
     }
     let age_days = target_jd - natal_jd;
     let age_years = age_days / TROPICAL_YEAR;
     let _g = engine::lock();
-    prepare(&settings);
+    prepare(&settings, Some(&req.natal));
 
     // Sekundärprogression: ein Tag nach der Geburt = ein Jahr
     let sec_jd = natal_jd + age_years;
@@ -254,7 +271,7 @@ fn progressed_chart(
 
 pub fn moon_phase_name(elongation: f64) -> &'static str {
     match elongation {
-        e if e < 22.5 || e >= 337.5 => "Neumond",
+        e if !(22.5..337.5).contains(&e) => "Neumond",
         e if e < 67.5 => "Zunehmende Sichel",
         e if e < 112.5 => "Zunehmender Halbmond (erstes Viertel)",
         e if e < 157.5 => "Zunehmender Mond (Dreiviertel)",
@@ -369,7 +386,7 @@ fn find_return(pt: CelestialPoint, natal_lon: f64, start_jd: f64, settings: &Cha
         let cur = f(nt)?;
         // Nulldurchgang von negativ nach positiv = rechtläufiges Überlaufen (Sprung bei ±180° ausschließen)
         if prev < 0.0 && cur >= 0.0 && (cur - prev).abs() < 90.0 {
-            return bisect(t, nt, &f);
+            return bisect(t, nt, f);
         }
         prev = cur;
         t = nt;
@@ -388,10 +405,13 @@ pub fn calculate_return(req: &ReturnRequest) -> Result<ReturnResponse, String> {
         .map(|p| p.longitude)
         .ok_or_else(|| format!("{} ist im Radix nicht berechnet (Einstellungen prüfen).", req.body))?;
     let _g = engine::lock();
-    prepare(&settings);
+    prepare(&settings, Some(&req.natal));
 
     let count = req.count.clamp(1, 24);
-    let mut start = req.start.jd_ut();
+    if settings.topocentric {
+        sweph::set_topocentric(req.longitude.unwrap_or(req.natal.longitude), req.latitude.unwrap_or(req.natal.latitude), 0.0);
+    }
+    let mut start = req.start.checked_jd_ut()?;
     let mut returns = Vec::new();
     let mut first_jd = None;
     for _ in 0..count {
@@ -499,8 +519,8 @@ fn default_transit_bodies() -> Vec<CelestialPoint> {
 pub fn search_transits(req: &TransitSearchRequest) -> Result<TransitSearchResponse, String> {
     let natal = calculate_chart(&req.natal)?;
     let settings = settings_of(&req.natal);
-    let start = req.start.jd_ut();
-    let end = req.end.jd_ut();
+    let start = req.start.checked_jd_ut()?;
+    let end = req.end.checked_jd_ut()?;
     if end <= start {
         return Err("Das Ende liegt vor dem Beginn.".into());
     }
@@ -534,7 +554,7 @@ pub fn search_transits(req: &TransitSearchRequest) -> Result<TransitSearchRespon
     };
 
     let _g = engine::lock();
-    prepare(&settings);
+    prepare(&settings, Some(&req.natal));
     let orb = req.orb.clamp(0.1, 5.0);
     let mut events: Vec<TransitEvent> = Vec::new();
 
@@ -579,7 +599,7 @@ pub fn search_transits(req: &TransitSearchRequest) -> Result<TransitSearchRespon
                             for k in begin_idx..j {
                                 let (a, b) = (f_at(lons[k]), f_at(lons[k + 1]));
                                 if (a < 0.0) != (b < 0.0) && (a - b).abs() < 90.0 {
-                                    exacts.push(bisect(times[k], times[k + 1], &f_time)?);
+                                    exacts.push(bisect(times[k], times[k + 1], f_time)?);
                                 }
                             }
                             // Ränder des Orbis verfeinern
@@ -676,15 +696,17 @@ pub struct SkyEvent {
 }
 
 pub fn sky_events(req: &SkyEventsRequest) -> Result<Vec<SkyEvent>, String> {
-    let start = req.start.jd_ut();
-    let end = req.end.jd_ut();
+    let start = req.start.checked_jd_ut()?;
+    let end = req.end.checked_jd_ut()?;
     if end <= start {
         return Err("Das Ende liegt vor dem Beginn.".into());
     }
     if end - start > 3660.0 {
         return Err("Der Zeitraum ist auf 10 Jahre begrenzt.".into());
     }
-    let settings = req.settings.clone().unwrap_or_default();
+    let mut settings = req.settings.clone().unwrap_or_default();
+    // Global sky events have no observing location.
+    settings.topocentric = false;
     let want = |k: &str| req.kinds.is_empty() || req.kinds.iter().any(|x| x == k);
     let zone = req.display_timezone.as_deref();
 
@@ -714,7 +736,7 @@ pub fn sky_events(req: &SkyEventsRequest) -> Result<Vec<SkyEvent>, String> {
     };
 
     let _g = engine::lock();
-    prepare(&settings);
+    prepare(&settings, None);
     let mut out: Vec<SkyEvent> = Vec::new();
     let step = 0.5;
     let n = ((end - start) / step).ceil() as usize + 2;
@@ -739,7 +761,7 @@ pub fn sky_events(req: &SkyEventsRequest) -> Result<Vec<SkyEvent>, String> {
                         let f = |tt: f64| -> Result<f64, String> {
                             Ok(signed_diff(point_position(body, tt, &settings)?.lon, boundary))
                         };
-                        let tx = bisect(prev_t, t, &f)?;
+                        let tx = bisect(prev_t, t, f)?;
                         let sign = ZodiacSign::from_degrees(cur.lon).0;
                         let retro = cur.speed < 0.0;
                         out.push(SkyEvent {
@@ -755,10 +777,10 @@ pub fn sky_events(req: &SkyEventsRequest) -> Result<Vec<SkyEvent>, String> {
                         });
                     }
                 }
-                if want("station") && body != CelestialPoint::Sun {
-                    if (prev.speed < 0.0) != (cur.speed < 0.0) {
+                if want("station") && body != CelestialPoint::Sun
+                    && (prev.speed < 0.0) != (cur.speed < 0.0) {
                         let f = |tt: f64| -> Result<f64, String> { Ok(point_position(body, tt, &settings)?.speed) };
-                        let tx = bisect(prev_t, t, &f)?;
+                        let tx = bisect(prev_t, t, f)?;
                         let pos = point_position(body, tx, &settings)?;
                         let to_retro = cur.speed < 0.0;
                         out.push(SkyEvent {
@@ -773,7 +795,6 @@ pub fn sky_events(req: &SkyEventsRequest) -> Result<Vec<SkyEvent>, String> {
                             natal_contacts: contacts(pos.lon, 2.0, false),
                         });
                     }
-                }
                 prev_t = t;
                 prev = cur;
             }
@@ -799,7 +820,7 @@ pub fn sky_events(req: &SkyEventsRequest) -> Result<Vec<SkyEvent>, String> {
                 let crossed = if cur < prev { 0 } else { q1 } as usize % 4;
                 let target = crossed as f64 * 90.0;
                 let f = |tt: f64| -> Result<f64, String> { Ok(signed_diff(elong(tt)?, target)) };
-                let tx = bisect(prev_t, t, &f)?;
+                let tx = bisect(prev_t, t, f)?;
                 let moon = point_position(CelestialPoint::Moon, tx, &settings)?;
                 let glyph = ["🌑", "🌓", "🌕", "🌗"][crossed];
                 out.push(SkyEvent {
@@ -904,8 +925,8 @@ pub struct GraphicEphemerisResponse {
 pub fn graphic_ephemeris(req: &GraphicEphemerisRequest) -> Result<GraphicEphemerisResponse, String> {
     let natal = calculate_chart(&req.natal)?;
     let settings = settings_of(&req.natal);
-    let start = req.start.jd_ut();
-    let end = req.end.jd_ut();
+    let start = req.start.checked_jd_ut()?;
+    let end = req.end.checked_jd_ut()?;
     if end <= start {
         return Err("Das Ende liegt vor dem Beginn.".into());
     }
@@ -920,7 +941,7 @@ pub fn graphic_ephemeris(req: &GraphicEphemerisRequest) -> Result<GraphicEphemer
         req.bodies.iter().filter_map(|b| point_by_name(b)).collect()
     };
     let _g = engine::lock();
-    prepare(&settings);
+    prepare(&settings, Some(&req.natal));
     let times: Vec<f64> = (0..n).map(|i| (start + i as f64 * step).min(end)).collect();
     let mut series = Vec::new();
     for b in bodies {

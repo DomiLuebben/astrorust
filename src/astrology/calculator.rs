@@ -31,6 +31,22 @@ pub struct ChartInput<'a> {
     pub timezone_info: Option<TzInfo>,
 }
 
+/// Zeitzone + Ortszeit → UTC-Offset (mit Sommerzeit, LMT-Korrektur auf den Ort).
+pub fn resolve_zone(zone: &str, year: i32, month: i32, day: i32, local_hour: f64, longitude: f64) -> Result<TzInfo, String> {
+    let jd_local = julian_day_ut(year, month, day, local_hour);
+    let local_secs = days_to_epoch_secs(jd_local);
+    let mut info = tz::resolve_local(zone, local_secs)?;
+    if info.is_lmt {
+        // Vor der Zonenzeit gilt die mittlere Ortszeit des Geburtsortes, nicht die der Zonenstadt.
+        info.offset_hours = longitude / 15.0;
+        info.note = format!(
+            "Mittlere Ortszeit (LMT) des Ortes, {} – vor Einführung der Zonenzeit",
+            format_utc_offset(info.offset_hours)
+        );
+    }
+    Ok(info)
+}
+
 /// Löst Datum/Uhrzeit/Zone einer Anfrage zu JD (UT), Offset und Zeitzoneninfo auf.
 pub fn resolve_time(req: &ChartRequest) -> Result<(f64, f64, Option<TzInfo>), String> {
     validate_request(req)?;
@@ -39,17 +55,7 @@ pub fn resolve_time(req: &ChartRequest) -> Result<(f64, f64, Option<TzInfo>), St
     let zone = req.timezone.as_deref().map(str::trim).filter(|z| !z.is_empty());
     let (offset, info) = match zone {
         Some(z) => {
-            let jd_local = julian_day_ut(req.year, req.month, req.day, local_hour);
-            let local_secs = days_to_epoch_secs(jd_local);
-            let mut info = tz::resolve_local(z, local_secs)?;
-            if info.is_lmt {
-                // Vor der Zonenzeit gilt die mittlere Ortszeit des Geburtsortes, nicht die der Zonenstadt.
-                info.offset_hours = req.longitude / 15.0;
-                info.note = format!(
-                    "Mittlere Ortszeit (LMT) des Ortes, {} – vor Einführung der Zonenzeit",
-                    format_utc_offset(info.offset_hours)
-                );
-            }
+            let info = resolve_zone(z, req.year, req.month, req.day, local_hour, req.longitude)?;
             (info.offset_hours, Some(info))
         }
         None => (req.timezone_offset, None),
@@ -106,6 +112,7 @@ pub fn position_flags(settings: &ChartSettings) -> sweph::Flags {
         flags |= sweph::Flags::SIDEREAL;
     }
     if settings.topocentric {
+        flags |= sweph::Flags::TOPOCENTRIC;
     }
     flags
 }
@@ -238,7 +245,7 @@ pub fn build_chart(input: &ChartInput) -> Result<ChartResponse, String> {
                 },
                 other => other.sweph_body(),
             };
-            sweph::calc_with(jd_ut, body, sweph::Flags::SWISS | sweph::Flags::EQUATORIAL)
+            sweph::calc_with(jd_ut, body, sweph::Flags::SWISS | sweph::Flags::EQUATORIAL | if settings.topocentric { sweph::Flags::TOPOCENTRIC } else { sweph::Flags::NONE })
                 .map(|p| p.latitude)
                 .unwrap_or(0.0)
         };

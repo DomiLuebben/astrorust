@@ -78,6 +78,10 @@ fn start_native_qt_gui() -> Result<(), Box<dyn std::error::Error>> {
         "gui/main.py".to_string(),
     ];
 
+    if std::env::current_exe().is_ok_and(|p| p.starts_with(concat!(env!("CARGO_MANIFEST_DIR"), "/target/"))) {
+        candidates.insert(0, format!("{}/gui/main.py", env!("CARGO_MANIFEST_DIR")));
+    }
+
     if let Ok(exe_path) = std::env::current_exe() {
         if let Some(parent) = exe_path.parent() {
             candidates.push(parent.join("../share/astrorust/gui/main.py").to_string_lossy().to_string());
@@ -152,7 +156,7 @@ fn run_terminal_mode(args: &CliArgs) -> Result<(), Box<dyn std::error::Error>> {
         }),
     };
 
-    let chart = calculate_chart(&req).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+    let chart = calculate_chart(&req).map_err(std::io::Error::other)?;
 
     println!("\n\x1b[1;36m=== ASTRORUST HOROSKOP: {} ===\x1b[0m", chart.name);
     println!("Datum/Zeit: {} | Ort: {}", chart.date_time, chart.location_name);

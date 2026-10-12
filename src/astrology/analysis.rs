@@ -762,7 +762,7 @@ fn chart_shape(planets: &[PlanetData]) -> Option<ChartShape> {
         ("Bündel (Bundle)", "Alle Planeten innerhalb von 120°: starke Konzentration, Spezialisierung, aber auch Einseitigkeit.")
     } else if span <= 180.0 {
         // Eimer: ein einzelner Planet (Henkel) mit ≥ 60° Abstand zu beiden Seiten, Rest in einer Hälfte
-        let handle = group_sizes.len() == 2 && group_sizes.iter().any(|s| *s == 1);
+        let handle = group_sizes.len() == 2 && group_sizes.contains(&1);
         if handle {
             ("Eimer (Bucket)", "Eine Halbkugel gefüllt, ein einzelner Planet als Henkel: dieser Planet bündelt die Energie des Horoskops.")
         } else {

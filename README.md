@@ -1,138 +1,77 @@
-# ✨ Astrorust
+# Astrorust 1.1.0
 
-> **Open-Source Astrologie- und Ephemeriden-Software inspiriert von Astroplus, umgesetzt in Rust und nativem Qt6.**
->
-> Entwickelt mit modernem KDE Breeze Dark Design, hochpräziser Swiss Ephemeris 2.10 Engine und integrierter KI-Deutungssynthese (lokale LLMs & APIs).
+Astrologie- und Ephemeridenprogramm für Linux mit Rust-Rechenkern, Swiss Ephemeris 2.10.03 und nativer PyQt6-Oberfläche.
 
----
+## Funktionen
 
-## 🌟 Highlights & Features
+- Beliebig viele Horoskope in unabhängigen Tabs, interaktives Rad, Radix-SVG und PDF-Berichte mit Tabellen, Analyse und KI-Deutung.
+- Historische IANA-Zeitzonen einschließlich Sommerzeit aus der installierten `tzdata`. Vor Einführung der Zonenzeit: mittlere Ortszeit des Geburtsorts (Länge/15). Mehrdeutige oder übersprungene Ortszeiten werden angezeigt; ein manueller UTC-Offset ist möglich.
+- Offline-Atlas: rund 320 kuratierte Orte plus Referenzorte der System-Zeitzonendatenbank. Keine GeoNames-Daten. Freie Koordinaten und freie IANA-Zone sind möglich. Die Zone zu freien Koordinaten ist ein Vorschlag anhand des nächsten Atlasorts, keine Ermittlung politischer Zeitzonengrenzen.
+- Sonne bis Pluto, Chiron, wahrer/mittlerer Mondknoten, Südknoten, mittlere/osculierende Lilith, optional Ceres, Pallas, Juno und Vesta. Fixsternkonjunktionen. Tropischer oder siderischer Tierkreis mit Ayanamsa-Wahl; optionale topozentrische Positionen am Geburtsort.
+- Acht Häusersysteme: Placidus, Koch, Regiomontanus, Campanus, Ganzzeichen, Äqual, Topozentrisch und Porphyrius. Quadrantensysteme am Polarkreis weichen mit Hinweis auf Porphyrius aus.
+- Zehn Aspektarten mit einstellbaren Orben, Zuschlag für Sonne/Mond und Abschlag für Nebenpunkte.
+- Klassische Würden einschließlich Triplizitäten, Grenzen, Dekanaten, Rezeptionen, Dispositoren und Sekte; Aspektfiguren, Verteilung, Halbsummen mit 90°-Scheibe, arabische Lose und Deklinationsparallelen.
+- Prognose: Sekundär-, Tertiär- und Minorprogression, Solarbogen, Sonnen-/Mond-/Planetenreturns einschließlich Relokation, Transitsuche mit exakten Zeitpunkten und Zeitleiste, Ingresse, Stationen, Mondphasen, Finsternisse und grafische Ephemeride.
+- Synastrie mit Aspektgitter, Häuserüberlagerung, Composite und Davison.
+- Vedische Tafeln (nord-/südindisch), Nakshatras, Pada, Vimshottari-Dasha mit Unterperioden und Teilungshoroskope einschließlich Navamsa.
+- Astrokartografie mit MC/IC/AC/DC-Linien, zoombarer Weltkarte und Orten nahe den Linien.
+- Horoskop-Datenbank mit Suche, Gruppen, Stichwörtern und Notizen. JSON-, CSV- und AAF-Import/Export. Ein fehlerhafter Import verändert die Datenbank nicht.
+- Elf KI-Themen: Radix, Beruf, Partnerschaft, Seelenleben, Karma, Transite, Progression, Return, Synastrie, Vedisch und Astrokartografie. Streaming, Kopieren, Speichern und automatischer Verlauf; Deutsch/Englisch als Antwortsprache. Lokale Claude-/Codex-CLIs, Ollama, OpenAI-kompatible Server (LM Studio/vLLM) sowie Anthropic, Gemini, OpenAI, DeepSeek und OpenRouter mit eigenen Schlüsseln.
+- Deutsche und englische Bedienoberfläche (Neustart nach Sprachwechsel). Regelbasierte längere Deutungen, einige berechnete Fachtexte und Fehlermeldungen bleiben deutsch.
 
-Astrorust kombiniert die Zuverlässigkeit und Geschwindigkeit von **Rust** mit einer nativen Linux-Desktop-Oberfläche (**Qt6 / QPainter**) und einem modularen **KI-Deutungssystem**:
+## Installation und Start
 
-* **🪐 Swiss Ephemeris 2.10.03 Core (`sweph`):**
-  * Auf Bogensekunden genaue Planetenpositionen und Häuserspitzen.
-  * Alle 10 klassischen Planeten (☉ Sonne, ☽ Mond, ☿ Merkur, ♀ Venus, ♂ Mars, ♃ Jupiter, ♄ Saturn, ♅ Uranus, ♆ Neptun, ♇ Pluto).
-  * ☊ Wahrer Mondknoten, ⚷ Chiron (mit `seas_18.se1` exakt, sonst aus JPL-Bahnelementen auf ±0,03° genau) und ⚸ Lilith (Mittleres Apogäum).
-  * 8 Häusersysteme: Placidus, Koch, Regiomontanus, Campanus, Ganzzeichen (Whole Sign), Äqual, Topozentrisch, Porphyrius.
-  * 10 Aspektarten mit konfigurierbaren Orben und Applikativ/Separativ-Status.
-  * Klassische Würden-Matrix (Domizil, Erhöhung, Fall, Exil).
-  * Bi-Wheel-Berechnungen für **Transite** und **Synastrie** (Partnervergleich).
-  * Vollständig in Rust implementiert und als C-ABI Shared Library (`libastrorust.so`) exportiert.
+Benötigt werden Python 3.10+, PyQt6 und `tzdata`; zum Bauen Rust/Cargo (geprüft mit 1.94) und ein C-Compiler.
 
-* **🎨 Native Qt6 Desktop-Oberfläche:**
-  * **KDE Breeze Dark Design:** Gestaltet nach der Designsprache des Linux Media Encoders (AME-Layout, `#1a1d20` Window, `#232629` Surface, `#3daee9` Breeze-Blau).
-  * **Vektor-Horoskoprad (`QPainter`):** Gestochen scharfe Vektorgrafik mit Anti-Aliasing, 360°-Skala, Elementarfarben, Anti-Kollisions-Zeigern bei Stellien und interaktiven Tooltips beim Hovern über Planeten und Aspekte.
-  * **⏳ Zeitschieber / Time Travel:** Scrubber-Regler, Sprung-Tasten (`±10m`, `±1h`, `±1T`, `±1M`, `±1J`) und animierter Play-Modus zur visuellen Beobachtung von Planetenwanderungen in Echtzeit.
-  * **SVG-Export:** Export des aktuellen Radixrades als Vektorgrafik auf Knopfdruck.
-  * **Integrierter Orts-Atlas:** Koordinaten- und Zeitzonensuche für über 40 Städte (Zeitzone = heutige Standardzeit; für Geburten früherer Jahre und Sommerzeit bitte prüfen).
-
-* **🔮 Multi-Provider KI-Deutungsengine (Astroplus-Parität):**
-  * **Lokale KIs & CLIs:** Automatische Erkennung von Claude Code CLI (`claude`), Codex CLI (`codex`), lokalem Ollama (`http://127.0.0.1:11434`) oder LM Studio / vLLM.
-  * **Bring-Your-Own-Key (BYOK) wie in GenOffice:** Freie Wahl des bevorzugten Providers (Google Gemini, Anthropic Claude, OpenAI, DeepSeek, OpenRouter), eigene API-Keys und frei anpassbare Modellnamen.
-  * **7 tiefenpsychologische Deutungsmodule (Jungianisch / Liz Greene):**
-    1. 🌟 *Großes Radix-Persönlichkeitsprofil*
-    2. 🏛️ *Berufung, Karriere & Lebensziel* (MC & 10. Haus)
-    3. 💖 *Partnerschaft, Liebe & Beziehung* (Venus/Mars/7. Haus)
-    4. 🌙 *Seelenleben & emotionale Wurzeln* (Mond & 4. Haus IC)
-    5. 🪐 *Karma, Seelenplan & Schattenarbeit* (Saturn, Chiron, Lilith, Mondknoten)
-    6. ⏳ *Aktuelle Transite & Zeitqualität* (Jahresvorschau)
-    7. 👥 *Partnervergleich & Beziehungsdynamik* (Synastrie)
-
----
-
-## 🎯 Genauigkeit, Kalender & Ephemeridendateien
-
-* **Ohne Datendateien** rechnet die Swiss Ephemeris mit dem analytischen Moshier-Modell (Planeten ≈ 1″). **Chiron** braucht eigentlich `seas_18.se1`; fehlt die Datei, nutzt Astrorust eine Tabelle osculierender JPL-Bahnelemente (1700–2150, Abweichung ≤ 0,03° gegen JPL Horizons, außerhalb des Bereichs weniger genau).
-* **Mit Datendateien:** `*.se1`-Dateien von [astro.com/swisseph](https://www.astro.com/ftp/swisseph/ephe/) in `~/.local/share/astrorust/ephe/` (oder `/usr/share/astrorust/ephe/`, oder per `ASTRORUST_EPHE=/pfad`) ablegen – sie werden beim Start automatisch gefunden.
-* **Kalender:** Daten **vor dem 15.10.1582** gelten als **Julianisch** (wie historisch üblich), danach Gregorianisch.
-* **Zeitzone:** Das Feld „Zone“ ist der Abstand zu UTC in Stunden für den Geburtszeitpunkt. Vor Einführung der Zonenzeit gilt die **Ortszeit (LMT)**: Länge/15 (z. B. Ulm 9,99° E → +0,67).
-* **Polarkreis:** Placidus/Koch sind dort nicht definiert; Astrorust weicht dann auf Porphyrius aus und weist im Häusersystem darauf hin.
-
----
-
-## 🛠️ Systemvoraussetzungen
-
-* **Linux** (x86_64, aarch64)
-* **Rust & Cargo** (1.75+ empfohlen)
-* **Python 3.10+** mit **PyQt6** (`python3 -m pip install PyQt6` oder `sudo pacman -S python-pyqt6` / `sudo apt install python3-pyqt6`)
-* C-Compiler (`gcc` oder `clang`) für das Bauen der C-Bibliothek von Swiss Ephemeris.
-
----
-
-## 🚀 Installation & Start
-
-### 1. Repository klonen
-
-```bash
+```sh
 git clone https://github.com/DomiLuebben/astrorust.git
 cd astrorust
-```
-
-### 2. Rust-Bibliothek bauen
-
-```bash
-cargo build --release
-```
-
-*(Oder `cargo build` für den Debug-Build).*
-
-### 3. Native Desktop-App starten
-
-Entweder direkt über das Shell-Skript:
-```bash
+cargo build --release --locked
 ./run_gui.sh
 ```
 
-Oder über Cargo:
-```bash
-cargo run
+Arch Linux: `makepkg -f` baut das Installationspaket. Es enthält sämtliche GUI-Module, die Weltkarte, Ephemeridendateien, Dokumentation und Lizenzhinweise. Die fertige Datei lässt sich mit `sudo pacman -U astrorust-1.1.0-1-x86_64.pkg.tar.zst` installieren.
+
+## Rechengenauigkeit und Grenzen
+
+Die mitgelieferten `_18.se1`-Dateien decken ungefähr 1800–2399 ab. Außerhalb dieses Bereichs nutzt die Swiss Ephemeris für die großen Planeten das Moshier-Modell. Für Chiron gibt es zusätzlich einen JPL-Bahnelemente-Fallback (1700–2150 gegen Horizons geprüft, maximale Abweichung etwa 0,03°). Asteroiden benötigen passende Datendateien; außerhalb deren Abdeckung gibt es eine Fehlermeldung. Das Diagnosemenü zeigt die vorhandenen Dateien.
+
+Suchreihenfolge: `$ASTRORUST_EPHE`, `~/.local/share/astrorust/ephe`, `/usr/share/astrorust/ephe`, Projektverzeichnis `ephe/`, systemweite Swiss-Ephemeris-Verzeichnisse. Eigene zusätzliche `.se1`-Dateien können dort abgelegt werden.
+
+Daten vor dem 15.10.1582 werden julianisch gelesen, danach gregorianisch. Das Datumsfeld und der Kalender beachten auch julianische Schalttage. Die GUI unterstützt Jahre 100–3000, der Rust-Kern -3000–3000; praktisch verfügbare Ephemeriden begrenzen die jeweils berechenbaren Körper.
+
+AAF unterstützt Geburtsdaten mit `#A93`, `#B93`, `#ZNAM` und `#COM`, einschließlich Standard-/Sommer-/doppelter Sommerzeit, Ortszeit, Sekunden und Vorrang eines angegebenen Julianischen Tags. Zusatzdaten für Astrorust stehen in einem optionalen `#ASTRORUST`-Block. Unbekannte Geburtszeiten oder fehlende Koordinaten werden nicht erfunden. Abweichende explizite Kalender benötigen einen Julianischen Tag. Berechnete AAF-Positionen werden nicht übernommen, sondern neu berechnet. JSON ist das bevorzugte vollständige Sicherungsformat.
+
+Primärdirektionen, Profektionen und Firdaria waren in der ursprünglichen Ideenliste als spätere Erweiterungen genannt und gehören nicht zu Version 1.1.0. Ein großer GeoNames-Atlas wurde in der vorherigen Sitzung nicht zum Download ausgewählt.
+
+## Bedienung
+
+Geburtsdaten eingeben und **Berechnen** wählen. Die IANA-Zone bestimmt den historischen Offset; für einen eigenen Offset die Zone auf **manueller UTC-Offset** setzen. Person B wird für Synastrie links eingeblendet. Prognosen, Composite und Davison erscheinen über die Auswahl **Radanzeige** im Rad. PDF-Berichte zeigen stets das Radix passend zu den Radix-Tabellen; Synastrie-Daten werden als eigener Abschnitt ergänzt. SVG exportiert das eingegebene Radix.
+
+**Strg+T**: neuer Tab · **Strg+W**: Tab schließen · **F5**: berechnen · **F6**: jetzt · **Strg+D**: Datenbank · **Strg+S**: Profil speichern · **Strg+E**: SVG · **Strg+P**: PDF · **Strg+G**: KI-Deutung.
+
+Einstellungen und Profile: `~/.config/astrorust/`. Gespeicherte KI-Deutungen: `~/.local/share/astrorust/readings/`. API-Schlüssel werden lokal in einer Datei mit Modus 0600 gespeichert. Die ausgewählte KI erhält die Horoskopdaten bei einer aktiv gestarteten Deutung.
+
+## Terminalmodus
+
+```sh
+cargo run -- --cli --name "Berlin Beispiel" --date 1990-07-15 \
+  --time 14:30 --lat 52.52 --lon 13.405 --zone Europe/Berlin
 ```
 
----
+Weitere Optionen: `--tz` für manuelle UTC-Abweichung, `--sidereal`, `--ayanamsa`, `--asteroids`; `--help` zeigt alle Optionen.
 
-## 💻 CLI-Modus (Reine Terminal-Berechnung)
+## Prüfungen
 
-Astrorust kann Horoskope auch rein im Terminal ohne grafische Oberfläche auf Bogensekunden genau ausgeben:
-
-```bash
-cargo run -- --cli \
-  --name "Johann Wolfgang von Goethe" \
-  --date "1749-08-28" \
-  --time "12:00" \
-  --lat 50.1109 \
-  --lon 8.6821 \
-  --tz 0.58
+```sh
+cargo test --locked
+cargo clippy --all-targets --locked -- -D warnings
+python -m compileall -q gui
+python tests/test_gui.py
 ```
 
----
+Die GUI-Tests arbeiten mit einem eigenen temporären HOME unter `work/`, einem unsichtbaren Qt-Fenster und lokalen Testprozessen. Sie verändern keine Nutzerprofile und rufen keine kostenpflichtigen KI-Dienste auf. Referenztests gegen gespeicherte JPL-Horizons-Werte benötigen kein Netz. Release-Prüfstand und Änderungen: [CHANGELOG.md](CHANGELOG.md).
 
-## 📁 Projektstruktur
+## Quellen und Lizenz
 
-```
-astrorust/
-├── Cargo.toml            # Rust Manifest
-├── run_gui.sh            # One-Click Starter für die Desktop-GUI
-├── astrorust.desktop     # Desktop-Starter für KDE Plasma / GNOME
-├── src/                  # Rust Swiss-Ephemeris Core & FFI
-│   ├── lib.rs            # Rust Library Root
-│   ├── main.rs           # CLI Launcher & Terminal-Deutung
-│   ├── ffi.rs            # C-ABI Export (libastrorust.so)
-│   └── astrology/        # Berechnungsmodule (Planeten, Würden, Aspekte, Atlas...)
-└── gui/                  # Native Qt6 Desktop-Oberfläche
-    ├── main.py           # GUI Einstiegspunkt
-    ├── rust_backend.py   # ctypes FFI Bridge zu libastrorust.so
-    ├── chart_wheel.py    # Interaktives Radixrad (QPainter Vektor-Engine)
-    ├── mainwindow.py     # Hauptfenster (Breeze Dark, Splitter, Tabs)
-    ├── styles.py         # KDE Breeze Dark QSS & Theme Tokens
-    ├── ai_engine.py      # Multi-Provider KI Engine (Claude, Codex, Ollama, APIs)
-    └── ai_dialog.py      # Einstellungsdialog inkl. GenOffice-Import
-```
-
----
-
-## 📜 Lizenz & Danksagung
-
-* **Astrorust** steht unter der **GPL-3.0-or-later** Lizenz.
-* Berechnungen basieren auf der **Swiss Ephemeris** (Copyright © Astrodienst AG).
-* Inspiriert von der deutschen Astrologie-Referenzsoftware **Astroplus**.
+Eigener Astrorust-Quelltext: GPL-3.0-or-later. Die eingebundenen `sweph`-/`sweph-sys`-Crates und Swiss Ephemeris sind AGPL-3.0-only; das kombinierte Arch-Paket trägt deshalb AGPL-3.0-only. Originalhinweise und Lizenztext sind unter `licenses/` enthalten. Datenquellen, Dateihashes und Hinweise zur Weltkarte: [DATA_SOURCES.md](DATA_SOURCES.md).

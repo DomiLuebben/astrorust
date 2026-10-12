@@ -110,7 +110,7 @@ fn angle_theme(kind: &str) -> &'static str {
 }
 
 fn meaning(p: CelestialPoint, kind: &str) -> String {
-    format!("{} {} – {}: {}", p.glyph(), p.name_de(), kind, format!("{} ({})", angle_theme(kind), planet_theme(p)))
+    format!("{} {} – {}: {} ({})", p.glyph(), p.name_de(), kind, angle_theme(kind), planet_theme(p))
 }
 
 fn split_segments(points: Vec<[f64; 2]>) -> Vec<Vec<[f64; 2]>> {

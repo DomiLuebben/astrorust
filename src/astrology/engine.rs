@@ -90,7 +90,7 @@ pub fn ephemeris_status() -> (Option<String>, bool, bool) {
 
 fn has_se1(dir: &str) -> bool {
     std::fs::read_dir(dir)
-        .map(|rd| rd.flatten().any(|e| e.path().extension().map_or(false, |x| x == "se1")))
+        .map(|rd| rd.flatten().any(|e| e.path().extension().is_some_and(|x| x == "se1")))
         .unwrap_or(false)
 }
 
@@ -131,6 +131,15 @@ pub fn ayanamsa_value(jd_ut: f64, ayanamsa_id: i32) -> Result<f64, String> {
 pub fn sidereal_time_hours(jd_ut: f64) -> f64 {
     let _g = lock();
     unsafe { swe_sidtime(jd_ut) }
+}
+
+/// Civil date using the same 1582 calendar switch as chart input.
+pub fn calendar_date(jd: f64) -> sweph::Date {
+    let _g = lock();
+    let (mut year, mut month, mut day, mut hour) = (0, 0, 0, 0.0);
+    let calendar = if jd < 2299160.5 { sweph_sys::SE_JUL_CAL } else { sweph_sys::SE_GREG_CAL };
+    unsafe { sweph_sys::swe_revjul(jd, calendar, &mut year, &mut month, &mut day, &mut hour) };
+    sweph::Date { year, month: month as u32, day: day as u32, hour }
 }
 
 /// Neigung der Ekliptik (wahre Schiefe) in Grad zu einem JD.
