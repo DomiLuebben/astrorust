@@ -1,8 +1,13 @@
-use crate::astrology::models::{AspectData, AspectType, CelestialPoint, PlanetData};
+use crate::astrology::models::{AspectData, AspectType, CelestialPoint, ChartSettings, PlanetData};
 use crate::astrology::util::format_orb;
 
 pub fn calculate_aspects(planets: &[PlanetData]) -> Vec<AspectData> {
-    let aspect_types = [
+    calculate_aspects_with(planets, &ChartSettings::default())
+}
+
+pub fn calculate_aspects_with(planets: &[PlanetData], settings: &ChartSettings) -> Vec<AspectData> {
+    // Reihenfolge der Prüfung (Hauptaspekte zuerst); nur die eingeschalteten Aspekte
+    let order = [
         AspectType::Conjunction,
         AspectType::Opposition,
         AspectType::Trine,
@@ -14,6 +19,7 @@ pub fn calculate_aspects(planets: &[PlanetData]) -> Vec<AspectData> {
         AspectType::SemiSextile,
         AspectType::Quintile,
     ];
+    let aspect_types: Vec<AspectType> = order.iter().copied().filter(|t| settings.aspects.contains(t)).collect();
 
     let mut results = Vec::new();
 
@@ -21,27 +27,28 @@ pub fn calculate_aspects(planets: &[PlanetData]) -> Vec<AspectData> {
         for j in (i + 1)..planets.len() {
             let p1 = &planets[i];
             let p2 = &planets[j];
+            // Der Südknoten steht immer genau gegenüber dem Nordknoten und bringt keine eigenen Aspekte
+            if p1.id == CelestialPoint::SouthNode || p2.id == CelestialPoint::SouthNode {
+                continue;
+            }
 
             let mut diff = (p1.longitude - p2.longitude).abs();
             if diff > 180.0 {
                 diff = 360.0 - diff;
             }
 
-            for &asp in &aspect_types {
+            for &asp in aspect_types.iter() {
                 let target = asp.target_angle();
                 let orb = (diff - target).abs();
 
-                // Orbis: Sonne und Mond bekommen +1,5°; Mondknoten, Chiron und Lilith
-                // (ohne Sonne/Mond) werden um 1,5° enger gefasst, mindestens aber 1°.
+                // Orbis: Sonne/Mond bekommen einen Zuschlag; Knoten, Chiron, Lilith und Asteroiden
+                // (ohne Sonne/Mond) werden enger gefasst, mindestens aber 1°.
                 let is_luminary = |id: CelestialPoint| matches!(id, CelestialPoint::Sun | CelestialPoint::Moon);
-                let is_minor = |id: CelestialPoint| {
-                    matches!(id, CelestialPoint::TrueNode | CelestialPoint::Chiron | CelestialPoint::Lilith)
-                };
-                let mut max_orb = asp.default_orb();
+                let mut max_orb = settings.orb_for(asp);
                 if is_luminary(p1.id) || is_luminary(p2.id) {
-                    max_orb += 1.5;
-                } else if is_minor(p1.id) || is_minor(p2.id) {
-                    max_orb = (max_orb - 1.5).max(1.0);
+                    max_orb += settings.luminary_bonus;
+                } else if p1.id.is_sensitive_point() || p2.id.is_sensitive_point() {
+                    max_orb = (max_orb - settings.minor_point_reduction).max(1.0);
                 }
 
                 if orb <= max_orb {

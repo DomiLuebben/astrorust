@@ -1,5 +1,5 @@
 use astrorust::astrology::calculator::calculate_chart;
-use astrorust::astrology::models::{ChartRequest, HouseSystemChoice};
+use astrorust::astrology::models::{ChartRequest, ChartSettings, HouseSystemChoice, Zodiac};
 use clap::Parser;
 use std::process::Command;
 
@@ -37,9 +37,25 @@ pub struct CliArgs {
     #[arg(long, default_value_t = 13.405)]
     pub lon: f64,
 
-    /// Zeitzonen-Offset in Stunden (z.B. 1.0 für MEZ, 2.0 für MESZ)
+    /// Zeitzonen-Offset in Stunden (z.B. 1.0 für MEZ, 2.0 für MESZ); entfällt bei --zone
     #[arg(long, default_value_t = 1.0)]
     pub tz: f64,
+
+    /// IANA-Zeitzone (z.B. Europe/Berlin): Sommerzeit und Ortszeit werden historisch aufgelöst
+    #[arg(long)]
+    pub zone: Option<String>,
+
+    /// Siderischen Tierkreis verwenden (Ayanamsa siehe --ayanamsa)
+    #[arg(long)]
+    pub sidereal: bool,
+
+    /// Swiss-Ephemeris-Ayanamsa-ID (1 = Lahiri, 3 = Raman, 5 = Krishnamurti)
+    #[arg(long, default_value_t = 1)]
+    pub ayanamsa: i32,
+
+    /// Ceres, Pallas, Juno und Vesta mitberechnen
+    #[arg(long)]
+    pub asteroids: bool,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -127,12 +143,22 @@ fn run_terminal_mode(args: &CliArgs) -> Result<(), Box<dyn std::error::Error>> {
         longitude: args.lon,
         location_name: Some(format!("{:.2}°, {:.2}°", args.lat, args.lon)),
         house_system: Some(HouseSystemChoice::Placidus),
+        timezone: args.zone.clone(),
+        settings: Some(ChartSettings {
+            zodiac: if args.sidereal { Zodiac::Sidereal } else { Zodiac::Tropical },
+            ayanamsa: args.ayanamsa,
+            asteroids: args.asteroids,
+            ..ChartSettings::default()
+        }),
     };
 
     let chart = calculate_chart(&req).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
     println!("\n\x1b[1;36m=== ASTRORUST HOROSKOP: {} ===\x1b[0m", chart.name);
     println!("Datum/Zeit: {} | Ort: {}", chart.date_time, chart.location_name);
+    if let Some(tz) = &chart.timezone_info {
+        println!("Zeitzone: {}", tz.note);
+    }
     println!("AC: {} | MC: {}\n", chart.angles.ascendant_formatted, chart.angles.midheaven_formatted);
 
     println!("\x1b[1m{:<4} {:<12} {:<18} {:<6} {:<12} {:<4}\x1b[0m", "Pt", "Planet", "Position", "Haus", "Würde", "Rx");

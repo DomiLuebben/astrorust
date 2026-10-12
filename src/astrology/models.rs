@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum CelestialPoint {
     Sun,
     Moon,
@@ -15,6 +16,14 @@ pub enum CelestialPoint {
     TrueNode,
     Chiron,
     Lilith,
+    Ceres,
+    Pallas,
+    Juno,
+    Vesta,
+    SouthNode,
+    /// Achsen als Aspektpartner (nie in `settings.points()`)
+    Ascendant,
+    Midheaven,
 }
 
 impl CelestialPoint {
@@ -36,6 +45,36 @@ impl CelestialPoint {
         ]
     }
 
+    /// Die vier großen Asteroiden.
+    pub fn asteroids() -> &'static [CelestialPoint] {
+        &[
+            CelestialPoint::Ceres,
+            CelestialPoint::Pallas,
+            CelestialPoint::Juno,
+            CelestialPoint::Vesta,
+        ]
+    }
+
+    /// Die zehn klassischen Planeten (Sonne bis Pluto).
+    pub fn classical() -> &'static [CelestialPoint] {
+        &Self::all()[..10]
+    }
+
+    /// Punkte, die nicht als „Planeten“ für Element-/Qualitätszählung gelten.
+    pub fn is_sensitive_point(&self) -> bool {
+        matches!(
+            self,
+            CelestialPoint::TrueNode
+                | CelestialPoint::SouthNode
+                | CelestialPoint::Chiron
+                | CelestialPoint::Lilith
+                | CelestialPoint::Ceres
+                | CelestialPoint::Pallas
+                | CelestialPoint::Juno
+                | CelestialPoint::Vesta
+        )
+    }
+
     pub fn name_de(&self) -> &'static str {
         match self {
             CelestialPoint::Sun => "Sonne",
@@ -51,6 +90,13 @@ impl CelestialPoint {
             CelestialPoint::TrueNode => "Mondknoten",
             CelestialPoint::Chiron => "Chiron",
             CelestialPoint::Lilith => "Lilith",
+            CelestialPoint::Ceres => "Ceres",
+            CelestialPoint::Pallas => "Pallas",
+            CelestialPoint::Juno => "Juno",
+            CelestialPoint::Vesta => "Vesta",
+            CelestialPoint::SouthNode => "Südknoten",
+            CelestialPoint::Ascendant => "Aszendent",
+            CelestialPoint::Midheaven => "Medium Coeli",
         }
     }
 
@@ -69,6 +115,13 @@ impl CelestialPoint {
             CelestialPoint::TrueNode => "☊",
             CelestialPoint::Chiron => "⚷",
             CelestialPoint::Lilith => "⚸",
+            CelestialPoint::Ceres => "⚳",
+            CelestialPoint::Pallas => "⚴",
+            CelestialPoint::Juno => "⚵",
+            CelestialPoint::Vesta => "⚶",
+            CelestialPoint::SouthNode => "☋",
+            CelestialPoint::Ascendant => "AC",
+            CelestialPoint::Midheaven => "MC",
         }
     }
 
@@ -87,6 +140,11 @@ impl CelestialPoint {
             CelestialPoint::TrueNode => sweph::Body::TrueNode,
             CelestialPoint::Chiron => sweph::Body::Chiron,
             CelestialPoint::Lilith => sweph::Body::MeanApogee,
+            CelestialPoint::Ceres => sweph::Body::Ceres,
+            CelestialPoint::Pallas => sweph::Body::Pallas,
+            CelestialPoint::Juno => sweph::Body::Juno,
+            CelestialPoint::Vesta => sweph::Body::Vesta,
+            CelestialPoint::SouthNode | CelestialPoint::Ascendant | CelestialPoint::Midheaven => sweph::Body::TrueNode,
         }
     }
 }
@@ -234,7 +292,7 @@ impl ZodiacSign {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum HouseSystemChoice {
     Placidus,
     Koch,
@@ -260,6 +318,20 @@ impl HouseSystemChoice {
         }
     }
 
+    /// Buchstabencode der Swiss Ephemeris.
+    pub fn code(&self) -> u8 {
+        match self {
+            HouseSystemChoice::Placidus => b'P',
+            HouseSystemChoice::Koch => b'K',
+            HouseSystemChoice::Regiomontanus => b'R',
+            HouseSystemChoice::Campanus => b'C',
+            HouseSystemChoice::Equal => b'A',
+            HouseSystemChoice::WholeSign => b'W',
+            HouseSystemChoice::Topocentric => b'T',
+            HouseSystemChoice::Porphyry => b'O',
+        }
+    }
+
     pub fn name_de(&self) -> &'static str {
         match self {
             HouseSystemChoice::Placidus => "Placidus",
@@ -274,7 +346,7 @@ impl HouseSystemChoice {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum AspectType {
     Conjunction,
     SemiSextile,
@@ -388,6 +460,9 @@ pub struct PlanetData {
     pub formatted_deg: String,
     pub house: u8,
     pub dignity: Option<String>,
+    /// Deklination (für Parallelaspekte)
+    #[serde(default)]
+    pub declination: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -475,6 +550,159 @@ pub struct ChartResponse {
     pub aspects: Vec<AspectData>,
     pub element_quality: ElementQualitySummary,
     pub interpretations: Vec<InterpretationSection>,
+    #[serde(default)]
+    pub timezone_info: Option<crate::astrology::tz::TzInfo>,
+    #[serde(default)]
+    pub analysis: Option<crate::astrology::analysis::AnalysisData>,
+    #[serde(default)]
+    pub zodiac: Zodiac,
+    #[serde(default)]
+    pub ayanamsa_name: Option<String>,
+    #[serde(default)]
+    pub ayanamsa_value: Option<f64>,
+    /// Tageshoroskop (Sonne über dem Horizont)
+    #[serde(default)]
+    pub is_diurnal: bool,
+    /// Ob Swiss-Ephemeris-Datendateien verwendet wurden (sonst Moshier/Tabellen)
+    #[serde(default)]
+    pub ephemeris_files: bool,
+}
+
+/// Mondknoten: wahr oder mittel.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum NodeType {
+    #[default]
+    True,
+    Mean,
+}
+
+/// Lilith: mittleres oder oskulierendes Apogäum.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum LilithType {
+    #[default]
+    Mean,
+    Osculating,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum Zodiac {
+    #[default]
+    Tropical,
+    Sidereal,
+}
+
+fn default_true() -> bool {
+    true
+}
+fn default_lahiri() -> i32 {
+    1
+}
+fn default_luminary_bonus() -> f64 {
+    1.5
+}
+fn default_minor_reduction() -> f64 {
+    1.5
+}
+fn default_star_orb() -> f64 {
+    1.0
+}
+fn default_language() -> String {
+    "de".into()
+}
+fn default_aspects() -> Vec<AspectType> {
+    vec![
+        AspectType::Conjunction,
+        AspectType::Opposition,
+        AspectType::Trine,
+        AspectType::Square,
+        AspectType::Sextile,
+        AspectType::Quincunx,
+        AspectType::SemiSquare,
+        AspectType::Sesquiquadrate,
+        AspectType::SemiSextile,
+        AspectType::Quintile,
+    ]
+}
+
+/// Berechnungseinstellungen. Alle Felder sind optional; fehlende Felder haben das
+/// bisherige Standardverhalten.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct ChartSettings {
+    pub node: NodeType,
+    pub lilith: LilithType,
+    /// Ceres, Pallas, Juno, Vesta
+    pub asteroids: bool,
+    /// Südknoten als eigener Punkt
+    pub south_node: bool,
+    pub zodiac: Zodiac,
+    /// Swiss-Ephemeris-Ayanamsa-ID (nur bei `Sidereal`), Standard Lahiri
+    #[serde(default = "default_lahiri")]
+    pub ayanamsa: i32,
+    /// Topozentrische Positionen (wirkt vor allem beim Mond)
+    pub topocentric: bool,
+    /// Orbis je Aspekt (überschreibt den Standard)
+    pub orbs: HashMap<AspectType, f64>,
+    /// Zuschlag für Sonne/Mond
+    #[serde(default = "default_luminary_bonus")]
+    pub luminary_bonus: f64,
+    /// Abschlag für Knoten/Chiron/Lilith/Asteroiden
+    #[serde(default = "default_minor_reduction")]
+    pub minor_point_reduction: f64,
+    /// Welche Aspekte gesucht werden
+    #[serde(default = "default_aspects")]
+    pub aspects: Vec<AspectType>,
+    /// Fixstern-Konjunktionen berechnen
+    #[serde(default = "default_true")]
+    pub fixed_stars: bool,
+    #[serde(default = "default_star_orb")]
+    pub fixed_star_orb: f64,
+    /// Zusatzanalysen (Würden, Figuren, Halbsummen, Lose)
+    #[serde(default = "default_true")]
+    pub analysis: bool,
+    /// "de" oder "en"
+    #[serde(default = "default_language")]
+    pub language: String,
+}
+
+impl Default for ChartSettings {
+    fn default() -> Self {
+        ChartSettings {
+            node: NodeType::True,
+            lilith: LilithType::Mean,
+            asteroids: false,
+            south_node: false,
+            zodiac: Zodiac::Tropical,
+            ayanamsa: 1,
+            topocentric: false,
+            orbs: HashMap::new(),
+            luminary_bonus: 1.5,
+            minor_point_reduction: 1.5,
+            aspects: default_aspects(),
+            fixed_stars: true,
+            fixed_star_orb: 1.0,
+            analysis: true,
+            language: "de".into(),
+        }
+    }
+}
+
+impl ChartSettings {
+    pub fn orb_for(&self, aspect: AspectType) -> f64 {
+        self.orbs.get(&aspect).copied().unwrap_or_else(|| aspect.default_orb())
+    }
+
+    /// Welche Punkte berechnet werden.
+    pub fn points(&self) -> Vec<CelestialPoint> {
+        let mut v: Vec<CelestialPoint> = CelestialPoint::all().to_vec();
+        if self.asteroids {
+            v.extend_from_slice(CelestialPoint::asteroids());
+        }
+        if self.south_node {
+            v.push(CelestialPoint::SouthNode);
+        }
+        v
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -486,11 +714,18 @@ pub struct ChartRequest {
     pub hour: u32,
     pub minute: u32,
     pub second: Option<u32>,
-    pub timezone_offset: f64, // e.g. +1.0 for CET, +2.0 for CEST
+    /// Offset zu UTC in Stunden. Wird ignoriert, wenn `timezone` gesetzt ist.
+    #[serde(default)]
+    pub timezone_offset: f64,
     pub latitude: f64,
     pub longitude: f64,
     pub location_name: Option<String>,
     pub house_system: Option<HouseSystemChoice>,
+    /// IANA-Zone (z. B. "Europe/Berlin"): Offset und Sommerzeit werden historisch aufgelöst.
+    #[serde(default)]
+    pub timezone: Option<String>,
+    #[serde(default)]
+    pub settings: Option<ChartSettings>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -518,6 +753,9 @@ pub struct TransitToNatalAspect {
     pub orb: f64,
     pub formatted_orb: String,
     pub color_hex: String,
+    /// Aspekt wird exakter (Annäherung) statt weiter zu laufen
+    #[serde(default)]
+    pub is_applying: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -539,4 +777,14 @@ pub struct SynastryResponse {
     pub chart_b: ChartResponse,
     pub cross_aspects: Vec<TransitToNatalAspect>,
     pub compatibility_notes: Vec<InterpretationSection>,
+    #[serde(default)]
+    pub composite_chart: Option<ChartResponse>,
+    #[serde(default)]
+    pub davison_chart: Option<ChartResponse>,
+    #[serde(default)]
+    pub overlay_a_in_b: Vec<crate::astrology::synastry::OverlayEntry>,
+    #[serde(default)]
+    pub overlay_b_in_a: Vec<crate::astrology::synastry::OverlayEntry>,
+    #[serde(default)]
+    pub grid: crate::astrology::synastry::AspectGrid,
 }

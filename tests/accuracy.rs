@@ -23,6 +23,8 @@ fn request(year: i32, month: i32, day: i32, hour: u32, minute: u32, tz: f64, lat
         longitude: lon,
         location_name: None,
         house_system: Some(HouseSystemChoice::Placidus),
+        timezone: None,
+        settings: None,
     }
 }
 

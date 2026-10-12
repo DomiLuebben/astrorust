@@ -1,77 +1,191 @@
-use crate::astrology::aspects::calculate_aspects;
+use crate::astrology::analysis;
+use crate::astrology::aspects::calculate_aspects_with;
 use crate::astrology::chiron::chiron_position;
 use crate::astrology::dignities::calculate_dignity;
+use crate::astrology::engine;
 use crate::astrology::interpretations::generate_interpretations;
 use crate::astrology::models::{
-    AnglesData, CelestialPoint, ChartRequest, ChartResponse, Element, ElementQualitySummary,
-    HouseCuspData, HouseSystemChoice, PlanetData, Quality, ZodiacSign,
+    AnglesData, CelestialPoint, ChartRequest, ChartResponse, ChartSettings, Element, ElementQualitySummary,
+    HouseCuspData, HouseSystemChoice, LilithType, NodeType, PlanetData, Quality, ZodiacSign, Zodiac,
 };
+use crate::astrology::tz::{self, TzInfo};
 use crate::astrology::util::{
-    format_utc_offset, julian_day_ut, split_dm, split_dms, validate_request,
+    days_to_epoch_secs, format_utc_offset, julian_day_ut, split_dm, split_dms, validate_request,
 };
-use std::sync::Once;
-
-static EPHE_INIT: Once = Once::new();
-
-/// Sucht Swiss-Ephemeris-Dateien (`*.se1`) und meldet den Pfad an die C-Bibliothek.
-/// Ohne Dateien rechnet die Bibliothek mit Moshier (für Chiron greift `chiron.rs`).
-fn init_ephemeris() {
-    EPHE_INIT.call_once(|| {
-        let mut candidates: Vec<String> = Vec::new();
-        if let Ok(p) = std::env::var("ASTRORUST_EPHE") {
-            candidates.push(p);
-        }
-        if let Ok(home) = std::env::var("HOME") {
-            candidates.push(format!("{}/.local/share/astrorust/ephe", home));
-        }
-        candidates.push("/usr/share/astrorust/ephe".into());
-        candidates.push("/usr/share/swisseph".into());
-        candidates.push("/usr/share/sweph/ephe".into());
-        for dir in candidates {
-            let has_files = std::fs::read_dir(&dir)
-                .map(|rd| {
-                    rd.flatten()
-                        .any(|e| e.path().extension().map_or(false, |x| x == "se1"))
-                })
-                .unwrap_or(false);
-            if has_files && !dir.contains('\0') {
-                sweph::set_ephe_path(&dir);
-                break;
-            }
-        }
-    });
-}
 
 fn format_angle(sign: ZodiacSign, sign_deg: f64) -> String {
     let (d, m) = split_dm(sign_deg);
     format!("{} {:02}° {:02}'", sign.glyph(), d, m)
 }
 
-pub fn calculate_chart(req: &ChartRequest) -> Result<ChartResponse, String> {
+/// Alles, was zur Berechnung eines Horoskops für einen festen Zeitpunkt nötig ist.
+pub struct ChartInput<'a> {
+    pub name: String,
+    pub jd_ut: f64,
+    pub latitude: f64,
+    pub longitude: f64,
+    pub house_system: HouseSystemChoice,
+    pub settings: &'a ChartSettings,
+    pub date_time_label: String,
+    pub location_name: String,
+    pub timezone_info: Option<TzInfo>,
+}
+
+/// Löst Datum/Uhrzeit/Zone einer Anfrage zu JD (UT), Offset und Zeitzoneninfo auf.
+pub fn resolve_time(req: &ChartRequest) -> Result<(f64, f64, Option<TzInfo>), String> {
     validate_request(req)?;
-    init_ephemeris();
+    let local_hour = req.hour as f64 + req.minute as f64 / 60.0 + req.second.unwrap_or(0) as f64 / 3600.0;
 
-    // 1. Julianischer Tag (UT)
-    let dec_hour = req.hour as f64
-        + (req.minute as f64 / 60.0)
-        + (req.second.unwrap_or(0) as f64 / 3600.0);
-    let ut_hour = dec_hour - req.timezone_offset;
-    let jd_ut = julian_day_ut(req.year, req.month, req.day, ut_hour);
+    let zone = req.timezone.as_deref().map(str::trim).filter(|z| !z.is_empty());
+    let (offset, info) = match zone {
+        Some(z) => {
+            let jd_local = julian_day_ut(req.year, req.month, req.day, local_hour);
+            let local_secs = days_to_epoch_secs(jd_local);
+            let mut info = tz::resolve_local(z, local_secs)?;
+            if info.is_lmt {
+                // Vor der Zonenzeit gilt die mittlere Ortszeit des Geburtsortes, nicht die der Zonenstadt.
+                info.offset_hours = req.longitude / 15.0;
+                info.note = format!(
+                    "Mittlere Ortszeit (LMT) des Ortes, {} – vor Einführung der Zonenzeit",
+                    format_utc_offset(info.offset_hours)
+                );
+            }
+            (info.offset_hours, Some(info))
+        }
+        None => (req.timezone_offset, None),
+    };
+    let jd = julian_day_ut(req.year, req.month, req.day, local_hour - offset);
+    Ok((jd, offset, info))
+}
 
-    // 2. Häuser & Achsen. Quadrantensysteme sind innerhalb der Polarkreise nicht
-    //    definiert; dann wird – wie in gängiger Software – auf Porphyrius ausgewichen.
-    let requested_system = req.house_system.unwrap_or(HouseSystemChoice::Placidus);
-    let mut house_system_label = requested_system.name_de().to_string();
-    let houses_calc = match sweph::houses(
+pub fn calculate_chart(req: &ChartRequest) -> Result<ChartResponse, String> {
+    let (jd_ut, offset, info) = resolve_time(req)?;
+    let settings = req.settings.clone().unwrap_or_default();
+
+    let date_time_str = format!(
+        "{:04}-{:02}-{:02} {:02}:{:02} ({})",
+        req.year,
+        req.month,
+        req.day,
+        req.hour,
+        req.minute,
+        format_utc_offset(offset)
+    );
+
+    build_chart(&ChartInput {
+        name: req.name.clone(),
         jd_ut,
-        req.latitude,
-        req.longitude,
-        requested_system.to_sweph(),
-    ) {
+        latitude: req.latitude,
+        longitude: req.longitude,
+        house_system: req.house_system.unwrap_or(HouseSystemChoice::Placidus),
+        settings: &settings,
+        date_time_label: date_time_str,
+        location_name: req
+            .location_name
+            .clone()
+            .filter(|s| !s.trim().is_empty())
+            .unwrap_or_else(|| format!("{:.2}°, {:.2}°", req.latitude, req.longitude)),
+        timezone_info: info,
+    })
+}
+
+/// Rohposition eines Punktes.
+#[derive(Debug, Clone, Copy)]
+pub struct RawPos {
+    pub lon: f64,
+    pub lat: f64,
+    pub dist: f64,
+    pub speed: f64,
+    pub retro: bool,
+    pub files: bool,
+}
+
+pub fn position_flags(settings: &ChartSettings) -> sweph::Flags {
+    let mut flags = sweph::Flags::SWISS;
+    if settings.zodiac == Zodiac::Sidereal {
+        flags |= sweph::Flags::SIDEREAL;
+    }
+    if settings.topocentric {
+    }
+    flags
+}
+
+/// Position eines Punktes zu einem Zeitpunkt. Der Aufrufer hält die Engine-Sperre und hat
+/// bei siderischer Rechnung den Modus gesetzt.
+pub fn point_position(pt: CelestialPoint, jd_ut: f64, settings: &ChartSettings) -> Result<RawPos, String> {
+    let sidereal = settings.zodiac == Zodiac::Sidereal;
+    let body = match pt {
+        CelestialPoint::TrueNode | CelestialPoint::SouthNode => match settings.node {
+            NodeType::True => sweph::Body::TrueNode,
+            NodeType::Mean => sweph::Body::MeanNode,
+        },
+        CelestialPoint::Lilith => match settings.lilith {
+            LilithType::Mean => sweph::Body::MeanApogee,
+            LilithType::Osculating => sweph::Body::OsculatingApogee,
+        },
+        CelestialPoint::Ascendant | CelestialPoint::Midheaven => {
+            return Err("Achsen haben keine Planetenposition".into());
+        }
+        other => other.sweph_body(),
+    };
+    let raw = sweph::calc_with(jd_ut, body, position_flags(settings));
+    let mut p = match raw {
+        Ok(pos) => RawPos {
+            lon: pos.longitude.rem_euclid(360.0),
+            lat: pos.latitude,
+            dist: pos.distance,
+            speed: pos.speed_longitude,
+            retro: pos.retrograde(),
+            files: pos.ephemeris == sweph::Ephemeris::Swiss,
+        },
+        // Ohne seas_18.se1 kennt die Swiss Ephemeris Chiron nicht.
+        Err(_) if pt == CelestialPoint::Chiron => {
+            let (mut l, b, d, s, r) =
+                chiron_position(jd_ut).ok_or_else(|| "Fehler bei Planetenberechnung Chiron".to_string())?;
+            if sidereal {
+                let ay = engine::ayanamsa_value(jd_ut, settings.ayanamsa).unwrap_or(0.0);
+                l = (l - ay).rem_euclid(360.0);
+            }
+            RawPos { lon: l, lat: b, dist: d, speed: s, retro: r, files: false }
+        }
+        Err(e) => return Err(format!("Fehler bei Planetenberechnung {}: {:?}", pt.name_de(), e)),
+    };
+    if pt == CelestialPoint::SouthNode {
+        p.lon = (p.lon + 180.0).rem_euclid(360.0);
+    }
+    Ok(p)
+}
+
+/// Horoskop für einen festen Zeitpunkt (UT) und Ort.
+pub fn build_chart(input: &ChartInput) -> Result<ChartResponse, String> {
+    let _engine = engine::lock();
+    let settings = input.settings;
+    let sidereal = settings.zodiac == Zodiac::Sidereal;
+    let jd_ut = input.jd_ut;
+
+    let mut house_flags = sweph::Flags::NONE;
+    let mut ayanamsa_value = None;
+    let mut ayanamsa_name = None;
+    if sidereal {
+        engine::set_sidereal(settings.ayanamsa);
+        house_flags |= sweph::Flags::SIDEREAL;
+        ayanamsa_value = engine::ayanamsa_value(jd_ut, settings.ayanamsa).ok();
+        ayanamsa_name = engine::AYANAMSAS.iter().find(|(id, _)| *id == settings.ayanamsa).map(|(_, n)| n.to_string());
+        // ayanamsa_value() setzt den Modus erneut – gleiche ID, daher unkritisch
+    }
+    if settings.topocentric {
+        sweph::set_topocentric(input.longitude, input.latitude, 0.0);
+    }
+
+    // Häuser & Achsen. Quadrantensysteme sind innerhalb der Polarkreise nicht definiert;
+    // dann wird auf Porphyrius ausgewichen.
+    let requested_system = input.house_system;
+    let mut house_system_label = requested_system.name_de().to_string();
+    let houses_calc = match sweph::houses_with(jd_ut, input.latitude, input.longitude, requested_system.to_sweph(), house_flags) {
         Ok(h) => h,
         Err(first_err) => {
             let fallback = HouseSystemChoice::Porphyry;
-            match sweph::houses(jd_ut, req.latitude, req.longitude, fallback.to_sweph()) {
+            match sweph::houses_with(jd_ut, input.latitude, input.longitude, fallback.to_sweph(), house_flags) {
                 Ok(h) => {
                     house_system_label = format!(
                         "{} (Ersatz für {}: am Polarkreis nicht definiert)",
@@ -80,14 +194,11 @@ pub fn calculate_chart(req: &ChartRequest) -> Result<ChartResponse, String> {
                     );
                     h
                 }
-                Err(_) => {
-                    return Err(format!("Fehler bei Häuserberechnung: {:?}", first_err));
-                }
+                Err(_) => return Err(format!("Fehler bei Häuserberechnung: {:?}", first_err)),
             }
         }
     };
 
-    // 3. Häuserspitzen
     let mut house_cusps = Vec::with_capacity(12);
     for i in 0..12 {
         let cusp_deg = houses_calc.cusps[i].rem_euclid(360.0);
@@ -105,44 +216,139 @@ pub fn calculate_chart(req: &ChartRequest) -> Result<ChartResponse, String> {
         });
     }
 
-    // 4. Planeten
-    let mut planets = Vec::new();
-    for &pt in CelestialPoint::all() {
-        let (lon, lat, dist, speed, is_retro) = match sweph::calc(jd_ut, pt.sweph_body()) {
-            Ok(pos) => (
-                pos.longitude.rem_euclid(360.0),
-                pos.latitude,
-                pos.distance,
-                pos.speed_longitude,
-                pos.retrograde(),
-            ),
-            // Ohne seas_18.se1 kennt die Swiss Ephemeris Chiron nicht.
-            Err(_) if pt == CelestialPoint::Chiron => chiron_position(jd_ut)
-                .ok_or_else(|| "Fehler bei Planetenberechnung Chiron".to_string())?,
-            Err(e) => {
-                return Err(format!(
-                    "Fehler bei Planetenberechnung {}: {:?}",
-                    pt.name_de(),
-                    e
-                ));
-            }
-        };
+    // Planeten
+    let mut points: Vec<PointPos> = Vec::new();
+    let mut files_used = false;
+    for pt in settings.points() {
+        let pos = point_position(pt, jd_ut, settings)?;
+        files_used |= pos.files;
 
+        // Deklination (tropisch-äquatorial)
+        let decl = if pt == CelestialPoint::Chiron && !pos.files {
+            0.0
+        } else {
+            let body = match pt {
+                CelestialPoint::TrueNode | CelestialPoint::SouthNode => match settings.node {
+                    NodeType::True => sweph::Body::TrueNode,
+                    NodeType::Mean => sweph::Body::MeanNode,
+                },
+                CelestialPoint::Lilith => match settings.lilith {
+                    LilithType::Mean => sweph::Body::MeanApogee,
+                    LilithType::Osculating => sweph::Body::OsculatingApogee,
+                },
+                other => other.sweph_body(),
+            };
+            sweph::calc_with(jd_ut, body, sweph::Flags::SWISS | sweph::Flags::EQUATORIAL)
+                .map(|p| p.latitude)
+                .unwrap_or(0.0)
+        };
+        let decl = if pt == CelestialPoint::SouthNode { -decl } else { decl };
+        points.push(PointPos { id: pt, lon: pos.lon, lat: pos.lat, dist: pos.dist, speed: pos.speed, retro: pos.retro, decl });
+    }
+
+    let houses = HouseSet {
+        cusps: houses_calc.cusps,
+        ascendant: houses_calc.ascendant,
+        midheaven: houses_calc.midheaven,
+        vertex: houses_calc.vertex,
+    };
+    let meta = ChartMeta {
+        name: input.name.clone(),
+        date_time: input.date_time_label.clone(),
+        location_name: input.location_name.clone(),
+        latitude: input.latitude,
+        longitude: input.longitude,
+        julian_day: jd_ut,
+        house_system_label,
+        timezone_info: input.timezone_info.clone(),
+        ayanamsa_name,
+        ayanamsa_value,
+        ephemeris_files: files_used,
+    };
+    Ok(assemble_chart(&meta, points, &houses, settings))
+}
+
+/// Häuser und Achsen eines Horoskops.
+#[derive(Debug, Clone, Copy)]
+pub struct HouseSet {
+    pub cusps: [f64; 12],
+    pub ascendant: f64,
+    pub midheaven: f64,
+    pub vertex: f64,
+}
+
+/// Roh-Position eines Punktes für `assemble_chart`.
+#[derive(Debug, Clone, Copy)]
+pub struct PointPos {
+    pub id: CelestialPoint,
+    pub lon: f64,
+    pub lat: f64,
+    pub dist: f64,
+    pub speed: f64,
+    pub retro: bool,
+    pub decl: f64,
+}
+
+pub struct ChartMeta {
+    pub name: String,
+    pub date_time: String,
+    pub location_name: String,
+    pub latitude: f64,
+    pub longitude: f64,
+    pub julian_day: f64,
+    pub house_system_label: String,
+    pub timezone_info: Option<TzInfo>,
+    pub ayanamsa_name: Option<String>,
+    pub ayanamsa_value: Option<f64>,
+    pub ephemeris_files: bool,
+}
+
+/// Baut aus Positionen und Häusern die komplette Antwort (Zeichen, Häuser, Aspekte,
+/// Elemente, Deutungen, Analysen). Wird auch für Composite, Solarbogen usw. genutzt.
+pub fn assemble_chart(meta: &ChartMeta, points: Vec<PointPos>, houses_calc: &HouseSet, settings: &ChartSettings) -> ChartResponse {
+    let mut house_cusps = Vec::with_capacity(12);
+    for i in 0..12 {
+        let cusp_deg = houses_calc.cusps[i].rem_euclid(360.0);
+        let (sign, sign_deg) = ZodiacSign::from_degrees(cusp_deg);
+        let (deg_int, min_int) = split_dm(sign_deg);
+        house_cusps.push(HouseCuspData {
+            house_number: (i + 1) as u8,
+            longitude: cusp_deg,
+            sign,
+            sign_name: sign.name_de().to_string(),
+            sign_glyph: sign.glyph().to_string(),
+            deg_int,
+            min_int,
+            formatted_deg: format!("{:02}° {:02}'", deg_int, min_int),
+        });
+    }
+
+    let mut planets: Vec<PlanetData> = Vec::new();
+    for pp in &points {
+        let pt = pp.id;
+        let lon = pp.lon.rem_euclid(360.0);
         let (sign, sign_deg) = ZodiacSign::from_degrees(lon);
         let (deg_int, min_int, sec_int) = split_dms(sign_deg);
-
         let house_num = determine_house(lon, &houses_calc.cusps);
         let dignity = calculate_dignity(pt, sign);
 
+        let mut display_name = pt.name_de().to_string();
+        match pt {
+            CelestialPoint::TrueNode if settings.node == NodeType::Mean => display_name = "Mondknoten (mittel)".into(),
+            CelestialPoint::SouthNode if settings.node == NodeType::Mean => display_name = "Südknoten (mittel)".into(),
+            CelestialPoint::Lilith if settings.lilith == LilithType::Osculating => display_name = "Lilith (oskulierend)".into(),
+            _ => {}
+        }
+
         planets.push(PlanetData {
             id: pt,
-            name: pt.name_de().to_string(),
+            name: display_name,
             glyph: pt.glyph().to_string(),
             longitude: lon,
-            latitude: lat,
-            distance: dist,
-            speed,
-            is_retrograde: is_retro,
+            latitude: pp.lat,
+            distance: pp.dist,
+            speed: pp.speed,
+            is_retrograde: pp.retro,
             sign,
             sign_name: sign.name_de().to_string(),
             sign_glyph: sign.glyph().to_string(),
@@ -153,37 +359,27 @@ pub fn calculate_chart(req: &ChartRequest) -> Result<ChartResponse, String> {
             formatted_deg: format!("{:02}° {:02}' {:02}\"", deg_int, min_int, sec_int),
             house: house_num,
             dignity,
+            declination: pp.decl,
         });
     }
 
-    // 5. Achsen und Sonderpunkte
+    // Achsen und Sonderpunkte
     let asc_deg = houses_calc.ascendant.rem_euclid(360.0);
     let (asc_sign, asc_sign_deg) = ZodiacSign::from_degrees(asc_deg);
     let mc_deg = houses_calc.midheaven.rem_euclid(360.0);
     let (mc_sign, mc_sign_deg) = ZodiacSign::from_degrees(mc_deg);
-
     let desc_deg = (asc_deg + 180.0).rem_euclid(360.0);
     let (desc_sign, desc_sign_deg) = ZodiacSign::from_degrees(desc_deg);
     let ic_deg = (mc_deg + 180.0).rem_euclid(360.0);
     let (ic_sign, ic_sign_deg) = ZodiacSign::from_degrees(ic_deg);
-
     let vtx_deg = houses_calc.vertex.rem_euclid(360.0);
     let (vtx_sign, vtx_sign_deg) = ZodiacSign::from_degrees(vtx_deg);
 
-    // Glückspunkt (Pars Fortunae)
-    let sun_lon = planets
-        .iter()
-        .find(|p| p.id == CelestialPoint::Sun)
-        .map(|p| p.longitude)
-        .unwrap_or(0.0);
-    let moon_lon = planets
-        .iter()
-        .find(|p| p.id == CelestialPoint::Moon)
-        .map(|p| p.longitude)
-        .unwrap_or(0.0);
+    let lon_of = |id: CelestialPoint| planets.iter().find(|p| p.id == id).map(|p| p.longitude).unwrap_or(0.0);
+    let sun_lon = lon_of(CelestialPoint::Sun);
+    let moon_lon = lon_of(CelestialPoint::Moon);
 
-    // Tageshoroskop: Sonne über dem Horizont, also zwischen DC und AC gegen den
-    // Uhrzeigersinn (180°–360° vom AC aus). Unabhängig vom Häusersystem.
+    // Tageshoroskop: Sonne über dem Horizont (180°–360° vom AC aus) – unabhängig vom Häusersystem.
     let is_diurnal = (sun_lon - asc_deg).rem_euclid(360.0) >= 180.0;
     let fortune_deg = if is_diurnal {
         (asc_deg + moon_lon - sun_lon).rem_euclid(360.0)
@@ -209,25 +405,16 @@ pub fn calculate_chart(req: &ChartRequest) -> Result<ChartResponse, String> {
         vertex_formatted: format_angle(vtx_sign, vtx_sign_deg),
     };
 
-    // 6. Aspekte
-    let aspects = calculate_aspects(&planets);
+    let aspects = calculate_aspects_with(&planets, settings);
 
-    // 7. Elemente und Qualitäten: die zehn klassischen Planeten plus Aszendent.
-    //    Mondknoten, Chiron und Lilith sind Empfindlichkeitspunkte und zählen nicht mit.
+    // Elemente und Qualitäten: die zehn klassischen Planeten plus Aszendent.
     let (mut fire, mut earth, mut air, mut water) = (0, 0, 0, 0);
     let (mut cardinal, mut fixed, mut mutable) = (0, 0, 0);
-
     let counted_signs = planets
         .iter()
-        .filter(|p| {
-            !matches!(
-                p.id,
-                CelestialPoint::TrueNode | CelestialPoint::Chiron | CelestialPoint::Lilith
-            )
-        })
+        .filter(|p| !p.id.is_sensitive_point())
         .map(|p| p.sign)
         .chain(std::iter::once(asc_sign));
-
     for sign in counted_signs {
         match sign.element() {
             Element::Fire => fire += 1,
@@ -241,7 +428,6 @@ pub fn calculate_chart(req: &ChartRequest) -> Result<ChartResponse, String> {
             Quality::Mutable => mutable += 1,
         }
     }
-
     let dominant_element = {
         let mut max_e = ("Feuer", fire);
         if earth > max_e.1 {
@@ -255,7 +441,6 @@ pub fn calculate_chart(req: &ChartRequest) -> Result<ChartResponse, String> {
         }
         max_e.0.to_string()
     };
-
     let dominant_quality = {
         let mut max_q = ("Kardinal", cardinal);
         if fixed > max_q.1 {
@@ -266,61 +451,44 @@ pub fn calculate_chart(req: &ChartRequest) -> Result<ChartResponse, String> {
         }
         max_q.0.to_string()
     };
+    let element_quality = ElementQualitySummary { fire, earth, air, water, cardinal, fixed, mutable, dominant_element, dominant_quality };
 
-    let element_quality = ElementQualitySummary {
-        fire,
-        earth,
-        air,
-        water,
-        cardinal,
-        fixed,
-        mutable,
-        dominant_element,
-        dominant_quality,
-    };
-
-    // 8. Deutungen
     let interpretations = generate_interpretations(&planets, asc_sign, &aspects, &element_quality);
 
-    let date_time_str = format!(
-        "{:04}-{:02}-{:02} {:02}:{:02} ({})",
-        req.year,
-        req.month,
-        req.day,
-        req.hour,
-        req.minute,
-        format_utc_offset(req.timezone_offset)
-    );
-
-    Ok(ChartResponse {
-        name: req.name.clone(),
-        date_time: date_time_str,
-        location_name: req
-            .location_name
-            .clone()
-            .filter(|s| !s.trim().is_empty())
-            .unwrap_or_else(|| format!("{:.2}°, {:.2}°", req.latitude, req.longitude)),
-        latitude: req.latitude,
-        longitude: req.longitude,
-        julian_day: jd_ut,
-        house_system: house_system_label,
+    let mut chart = ChartResponse {
+        name: meta.name.clone(),
+        date_time: meta.date_time.clone(),
+        location_name: meta.location_name.clone(),
+        latitude: meta.latitude,
+        longitude: meta.longitude,
+        julian_day: meta.julian_day,
+        house_system: meta.house_system_label.clone(),
         planets,
         houses: house_cusps,
         angles,
         aspects,
         element_quality,
         interpretations,
-    })
+        timezone_info: meta.timezone_info.clone(),
+        analysis: None,
+        zodiac: settings.zodiac,
+        ayanamsa_name: meta.ayanamsa_name.clone(),
+        ayanamsa_value: meta.ayanamsa_value,
+        is_diurnal,
+        ephemeris_files: meta.ephemeris_files,
+    };
+    if settings.analysis {
+        chart.analysis = Some(analysis::analyze(&chart, settings));
+    }
+    chart
 }
 
-fn determine_house(lon: f64, cusps: &[f64; 12]) -> u8 {
+pub fn determine_house(lon: f64, cusps: &[f64; 12]) -> u8 {
     for i in 0..12 {
         let current_cusp = cusps[i].rem_euclid(360.0);
         let next_cusp = cusps[(i + 1) % 12].rem_euclid(360.0);
-
         let house_width = (next_cusp - current_cusp).rem_euclid(360.0);
         let dist = (lon - current_cusp).rem_euclid(360.0);
-
         if dist < house_width {
             return (i + 1) as u8;
         }

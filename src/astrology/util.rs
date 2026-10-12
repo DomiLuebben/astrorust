@@ -43,6 +43,11 @@ pub fn julian_day_ut(year: i32, month: i32, day: i32, hour: f64) -> f64 {
     jdn as f64 - 0.5 + hour / 24.0
 }
 
+/// Julianischer Tag (UT) → Sekunden seit 1970-01-01 00:00 (UT).
+pub fn days_to_epoch_secs(jd: f64) -> i64 {
+    ((jd - 2440587.5) * 86400.0).round() as i64
+}
+
 /// Prüft eine Horoskop-Anfrage und liefert eine verständliche Fehlermeldung.
 pub fn validate_request(req: &ChartRequest) -> Result<(), String> {
     if !(-3000..=3000).contains(&req.year) {
@@ -97,6 +102,23 @@ pub fn format_utc_offset(offset_hours: f64) -> String {
     let total_min = (offset_hours.abs() * 60.0).round() as i64;
     let sign = if offset_hours < 0.0 && total_min != 0 { '-' } else { '+' };
     format!("UTC{}{:02}:{:02}", sign, total_min / 60, total_min % 60)
+}
+
+/// Winkel in [0, 360).
+pub fn normalize_deg(x: f64) -> f64 {
+    x.rem_euclid(360.0)
+}
+
+/// Kleinster Abstand zweier Längen (0–180°).
+pub fn angle_diff(a: f64, b: f64) -> f64 {
+    let d = (a - b).rem_euclid(360.0);
+    if d > 180.0 { 360.0 - d } else { d }
+}
+
+/// Vorzeichenbehafteter Abstand a − b im Bereich (−180, 180].
+pub fn signed_diff(a: f64, b: f64) -> f64 {
+    let d = (a - b + 540.0).rem_euclid(360.0) - 180.0;
+    if d == -180.0 { 180.0 } else { d }
 }
 
 /// Maskiert Text für die Verwendung in XML/SVG.

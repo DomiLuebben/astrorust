@@ -17,6 +17,8 @@ pub fn get_preset_profiles() -> Vec<ChartRequest> {
             longitude: 9.9876,
             location_name: Some("Ulm, Deutschland".into()),
             house_system: Some(HouseSystemChoice::Placidus),
+            timezone: Some("Europe/Berlin".into()),
+            settings: None,
         },
         ChartRequest {
             name: "Johann Wolfgang von Goethe".into(),
@@ -31,6 +33,8 @@ pub fn get_preset_profiles() -> Vec<ChartRequest> {
             longitude: 8.6821,
             location_name: Some("Frankfurt am Main, Deutschland".into()),
             house_system: Some(HouseSystemChoice::Placidus),
+            timezone: Some("Europe/Berlin".into()),
+            settings: None,
         },
         ChartRequest {
             name: "Carl Gustav Jung".into(),
@@ -45,6 +49,8 @@ pub fn get_preset_profiles() -> Vec<ChartRequest> {
             longitude: 9.3175,
             location_name: Some("Kesswil, Schweiz".into()),
             house_system: Some(HouseSystemChoice::Placidus),
+            timezone: Some("Europe/Zurich".into()),
+            settings: None,
         },
         ChartRequest {
             name: "Marie Curie".into(),
@@ -59,6 +65,8 @@ pub fn get_preset_profiles() -> Vec<ChartRequest> {
             longitude: 21.0122,
             location_name: Some("Warschau, Polen".into()),
             house_system: Some(HouseSystemChoice::Placidus),
+            timezone: Some("Europe/Warsaw".into()),
+            settings: None,
         },
         ChartRequest {
             name: "Leonardo da Vinci".into(),
@@ -73,6 +81,8 @@ pub fn get_preset_profiles() -> Vec<ChartRequest> {
             longitude: 10.9250,
             location_name: Some("Vinci, Italien".into()),
             house_system: Some(HouseSystemChoice::Placidus),
+            timezone: Some("Europe/Rome".into()),
+            settings: None,
         },
         ChartRequest {
             name: "Aktueller Moment (Jetzt)".into(),
@@ -87,6 +97,8 @@ pub fn get_preset_profiles() -> Vec<ChartRequest> {
             longitude: 13.4050,
             location_name: Some("Berlin (Live UTC)".into()),
             house_system: Some(HouseSystemChoice::Placidus),
+            timezone: None,
+            settings: None,
         },
     ]
 }
