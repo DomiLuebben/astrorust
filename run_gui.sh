@@ -5,9 +5,9 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$DIR"
 
 # Ensure Rust library is built
-if [ ! -f "target/debug/libastrorust.so" ]; then
+if [ ! -f "target/release/libastrorust.so" ] && [ ! -f "target/debug/libastrorust.so" ]; then
     echo "Baue Astrorust Rust-Bibliothek..."
-    cargo build
+    cargo build --release
 fi
 
 # Launch native Qt6 GUI

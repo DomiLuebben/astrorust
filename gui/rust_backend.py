@@ -26,6 +26,7 @@ class RustBackend:
             os.path.join(base_dir, "target", "release", "libastrorust.so"),
             os.path.join(base_dir, "libastrorust.so"),
             "/usr/lib/libastrorust.so",
+            "/usr/lib/astrorust/libastrorust.so",
             "/usr/local/lib/libastrorust.so",
         ]
 

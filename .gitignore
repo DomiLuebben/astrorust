@@ -7,3 +7,9 @@ __pycache__/
 .DS_Store
 *.swp
 *.bak
+
+# Arch Packaging
+pkg/
+*.pkg.tar.zst
+*.sha256
+

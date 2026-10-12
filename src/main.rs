@@ -56,8 +56,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn start_native_qt_gui() -> Result<(), Box<dyn std::error::Error>> {
-    let manifest_dir = env!("CARGO_MANIFEST_DIR");
-    let gui_script = format!("{}/gui/main.py", manifest_dir);
+    let mut candidates = vec![
+        "/usr/share/astrorust/gui/main.py".to_string(),
+        format!("{}/gui/main.py", env!("CARGO_MANIFEST_DIR")),
+        "gui/main.py".to_string(),
+    ];
+
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(parent) = exe_path.parent() {
+            candidates.push(parent.join("../share/astrorust/gui/main.py").to_string_lossy().to_string());
+            candidates.push(parent.join("../../gui/main.py").to_string_lossy().to_string());
+        }
+    }
+
+    let gui_script = candidates
+        .into_iter()
+        .find(|p| std::path::Path::new(p).exists())
+        .unwrap_or_else(|| "/usr/share/astrorust/gui/main.py".to_string());
 
     println!("\x1b[38;2;61;174;233m");
     println!("  ╔══════════════════════════════════════════════════════════════════════════╗");
