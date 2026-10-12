@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtGui import QAction, QFont, QColor
 
+import json
 import re
 from PyQt6.QtWidgets import QCalendarWidget, QDialog
 from PyQt6.QtGui import QIcon
@@ -26,6 +27,18 @@ from rust_backend import RustBackend
 from ai_engine import AiConfig, AiGenerationWorker, detect_environment
 from ai_dialog import AiSettingsDialog
 import styles
+
+ASTRORUST_CONFIG_DIR = os.path.expanduser("~/.config/astrorust")
+ASTRORUST_PROFILES_PATH = os.path.join(ASTRORUST_CONFIG_DIR, "profiles.json")
+
+DEMO_PROFILE_NAMES = {
+    "Albert Einstein",
+    "Johann Wolfgang von Goethe",
+    "Carl Gustav Jung",
+    "Marie Curie",
+    "Leonardo da Vinci",
+    "Aktueller Moment (Jetzt)",
+}
 
 
 class AstroDateEdit(QLineEdit):
@@ -271,12 +284,49 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(12)
 
-        # 1. Preset Profile Schnellwähler
-        box_profile = QGroupBox("Profil-Schnellauswahl")
+        # 1. Profil-Verwaltung (Speichern & Löschen mit 1 Klick)
+        box_profile = QGroupBox("Profile")
         l_prof = QVBoxLayout(box_profile)
+        l_prof.setSpacing(6)
+
         self.combo_profiles = QComboBox()
         self.combo_profiles.currentIndexChanged.connect(self._on_profile_selected)
         l_prof.addWidget(self.combo_profiles)
+
+        h_prof_btns = QHBoxLayout()
+        h_prof_btns.setSpacing(6)
+
+        self.btn_save_profile = QPushButton("💾 Speichern")
+        self.btn_save_profile.setToolTip("Aktuell eingetragene Daten als Profil speichern")
+        self.btn_save_profile.clicked.connect(self._save_current_as_profile)
+        h_prof_btns.addWidget(self.btn_save_profile)
+
+        self.btn_delete_profile = QPushButton("🗑️ Löschen")
+        self.btn_delete_profile.setToolTip("Ausgewähltes Profil mit 1 Klick löschen")
+        self.btn_delete_profile.clicked.connect(self._delete_current_profile)
+        h_prof_btns.addWidget(self.btn_delete_profile)
+
+        l_prof.addLayout(h_prof_btns)
+
+        h_demo_actions = QHBoxLayout()
+        h_demo_actions.setContentsMargins(0, 2, 0, 0)
+        self.btn_clear_demos = QPushButton("🧹 Alle Demos löschen")
+        self.btn_clear_demos.setStyleSheet(f"color: {styles.TEXT_MUTED}; font-size: 11px; padding: 2px 4px; border: none; background: transparent; text-align: left;")
+        self.btn_clear_demos.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_clear_demos.setToolTip("Entfernt alle voreingestellten Demo-Profile (Einstein, Curie, Goethe etc.) auf einmal")
+        self.btn_clear_demos.clicked.connect(self._clear_all_demo_profiles)
+        h_demo_actions.addWidget(self.btn_clear_demos)
+
+        h_demo_actions.addStretch()
+
+        self.btn_reset_demos = QPushButton("🔄 Demos laden")
+        self.btn_reset_demos.setStyleSheet(f"color: {styles.TEXT_MUTED}; font-size: 11px; padding: 2px 4px; border: none; background: transparent; text-align: right;")
+        self.btn_reset_demos.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_reset_demos.setToolTip("Voreingestellte Demo-Profile wiederherstellen")
+        self.btn_reset_demos.clicked.connect(self._restore_demo_profiles)
+        h_demo_actions.addWidget(self.btn_reset_demos)
+
+        l_prof.addLayout(h_demo_actions)
         layout.addWidget(box_profile)
 
         # 2. Person A (Radix) Eingabe
@@ -730,24 +780,165 @@ class MainWindow(QMainWindow):
     # Datenverarbeitung & Horoskop-Berechnungen
     # ========================================================
 
-    def _load_profiles(self):
-        profiles = self.backend.get_profiles()
+    def _init_profiles(self):
+        self.saved_profiles = []
+        if os.path.exists(ASTRORUST_PROFILES_PATH):
+            try:
+                with open(ASTRORUST_PROFILES_PATH, "r", encoding="utf-8") as f:
+                    self.saved_profiles = json.load(f)
+            except Exception as e:
+                print("Fehler beim Laden von profiles.json:", e)
+                self.saved_profiles = []
+        else:
+            # Erster Start: Demo-Profile aus Backend als Initialbestand laden & persistieren
+            try:
+                self.saved_profiles = self.backend.get_profiles()
+                self._save_profiles_to_disk()
+            except Exception:
+                self.saved_profiles = []
+
+    def _save_profiles_to_disk(self):
+        try:
+            os.makedirs(ASTRORUST_CONFIG_DIR, exist_ok=True)
+            with open(ASTRORUST_PROFILES_PATH, "w", encoding="utf-8") as f:
+                json.dump(self.saved_profiles, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            print("Fehler beim Speichern von profiles.json:", e)
+
+    def _refresh_profiles_ui(self, select_name=None):
+        self.combo_profiles.blockSignals(True)
         self.combo_profiles.clear()
+
+        if not self.saved_profiles:
+            self.combo_profiles.addItem("(Keine Profile gespeichert)", None)
+            self.btn_delete_profile.setEnabled(False)
+        else:
+            self.btn_delete_profile.setEnabled(True)
+            target_idx = 0
+            for idx, p in enumerate(self.saved_profiles):
+                self.combo_profiles.addItem(p["name"], p)
+                if select_name and p.get("name") == select_name:
+                    target_idx = idx
+
+            self.combo_profiles.setCurrentIndex(target_idx)
+
+        self.combo_profiles.blockSignals(False)
+        self._refresh_profile_menu()
+
+    def _refresh_profile_menu(self):
         self.profile_menu.clear()
 
-        for idx, p in enumerate(profiles):
-            self.combo_profiles.addItem(p["name"], p)
+        act_save = self.profile_menu.addAction("💾 Aktuelles als Profil speichern")
+        act_save.setShortcut("Ctrl+S")
+        act_save.triggered.connect(self._save_current_as_profile)
+
+        act_del = self.profile_menu.addAction("🗑️ Ausgewähltes Profil löschen")
+        act_del.triggered.connect(self._delete_current_profile)
+
+        self.profile_menu.addSeparator()
+
+        act_clear_demo = self.profile_menu.addAction("🧹 Demo-Profile entfernen")
+        act_clear_demo.triggered.connect(self._clear_all_demo_profiles)
+
+        act_reset_demo = self.profile_menu.addAction("🔄 Demo-Profile wiederherstellen")
+        act_reset_demo.triggered.connect(self._restore_demo_profiles)
+
+        self.profile_menu.addSeparator()
+
+        for p in self.saved_profiles:
             act = self.profile_menu.addAction(p["name"])
-            act.triggered.connect(lambda _, p=p: self._apply_profile(p))
+            act.triggered.connect(lambda _, prof=p: self._apply_profile(prof))
+
+    def _save_current_as_profile(self):
+        d = self.edit_date.date()
+        t = self.edit_time.time()
+        name = self.edit_name.text().strip()
+        if not name:
+            name = "Mein Profil"
+            self.edit_name.setText(name)
+
+        new_prof = {
+            "name": name,
+            "year": d.year(),
+            "month": d.month(),
+            "day": d.day(),
+            "hour": t.hour(),
+            "minute": t.minute(),
+            "second": 0,
+            "timezone_offset": self.spin_tz.value(),
+            "latitude": self.spin_lat.value(),
+            "longitude": self.spin_lon.value(),
+            "location_name": self.edit_city.text().strip(),
+            "house_system": self.combo_houses.currentText(),
+        }
+
+        # Falls Profil mit selbem Namen existiert -> aktualisieren, sonst anhängen
+        updated = False
+        for idx, p in enumerate(self.saved_profiles):
+            if p.get("name") == name:
+                self.saved_profiles[idx] = new_prof
+                updated = True
+                break
+        if not updated:
+            self.saved_profiles.append(new_prof)
+
+        self._save_profiles_to_disk()
+        self._refresh_profiles_ui(select_name=name)
+        self.statusBar().showMessage(f"Profil '{name}' erfolgreich gespeichert!", 4000)
+
+    def _delete_current_profile(self):
+        idx = self.combo_profiles.currentIndex()
+        if idx < 0 or not self.saved_profiles:
+            return
+
+        p = self.combo_profiles.itemData(idx)
+        if not p:
+            return
+
+        del_name = p.get("name", "Profil")
+        self.saved_profiles = [x for x in self.saved_profiles if x.get("name") != del_name]
+        self._save_profiles_to_disk()
+        self._refresh_profiles_ui()
+
+        if self.saved_profiles:
+            self._apply_profile(self.saved_profiles[0])
+        self.statusBar().showMessage(f"Profil '{del_name}' gelöscht.", 4000)
+
+    def _clear_all_demo_profiles(self):
+        self.saved_profiles = [
+            p for p in self.saved_profiles if p.get("name") not in DEMO_PROFILE_NAMES
+        ]
+        self._save_profiles_to_disk()
+        self._refresh_profiles_ui()
+
+        if self.saved_profiles:
+            self._apply_profile(self.saved_profiles[0])
+        self.statusBar().showMessage("Alle Demo-Profile wurden entfernt.", 4000)
+
+    def _restore_demo_profiles(self):
+        demos = self.backend.get_profiles()
+        existing_names = {p.get("name") for p in self.saved_profiles}
+        for d in demos:
+            if d.get("name") not in existing_names:
+                self.saved_profiles.append(d)
+        self._save_profiles_to_disk()
+        self._refresh_profiles_ui()
+        self.statusBar().showMessage("Demo-Profile wiederhergestellt.", 4000)
+
+    def _load_profiles(self):
+        self._init_profiles()
+        self._refresh_profiles_ui()
+        if self.saved_profiles:
+            self._apply_profile(self.saved_profiles[0])
 
     def _apply_profile(self, p):
-        self.edit_name.setText(p["name"])
-        self.edit_date.setDate(QDate(p["year"], p["month"], p["day"]))
-        self.edit_time.setTime(QTime(p["hour"], p["minute"]))
+        self.edit_name.setText(p.get("name", ""))
+        self.edit_date.setDate(QDate(p.get("year", 2000), p.get("month", 1), p.get("day", 1)))
+        self.edit_time.setTime(QTime(p.get("hour", 12), p.get("minute", 0)))
         self.edit_city.setText(p.get("location_name", ""))
-        self.spin_lat.setValue(p["latitude"])
-        self.spin_lon.setValue(p["longitude"])
-        self.spin_tz.setValue(p["timezone_offset"])
+        self.spin_lat.setValue(p.get("latitude", 52.52))
+        self.spin_lon.setValue(p.get("longitude", 13.405))
+        self.spin_tz.setValue(p.get("timezone_offset", 1.0))
 
         hs = p.get("house_system", "Placidus")
         idx = self.combo_houses.findText(hs)
@@ -757,7 +948,7 @@ class MainWindow(QMainWindow):
         self._calculate_current()
 
     def _on_profile_selected(self, index):
-        if index < 0:
+        if index < 0 or not self.saved_profiles:
             return
         p = self.combo_profiles.itemData(index)
         if p:
