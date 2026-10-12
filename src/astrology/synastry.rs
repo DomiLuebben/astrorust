@@ -1,4 +1,5 @@
 use crate::astrology::calculator::calculate_chart;
+use crate::astrology::util::format_orb;
 use crate::astrology::models::{
     AspectType, CelestialPoint, InterpretationSection, SynastryRequest, SynastryResponse,
     TransitToNatalAspect,
@@ -31,9 +32,7 @@ pub fn calculate_synastry(req: &SynastryRequest) -> Result<SynastryResponse, Str
                 let orb = (diff - target).abs();
 
                 if orb <= 4.0 {
-                    let deg = orb.floor() as u32;
-                    let min = ((orb - orb.floor()) * 60.0).round() as u32;
-                    let formatted_orb = format!("{:02}°{:02}'", deg, min);
+                    let formatted_orb = format_orb(orb);
 
                     cross_aspects.push(TransitToNatalAspect {
                         transit_point: pa.id,

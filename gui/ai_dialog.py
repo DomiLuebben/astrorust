@@ -92,7 +92,7 @@ class AiSettingsDialog(QDialog):
         l_cloud.addWidget(QLabel("Google Gemini:"), 1, 0)
         self.edit_key_gemini = self._create_password_edit("AIzaSy...")
         self.edit_model_gemini = QLineEdit()
-        self.edit_model_gemini.setPlaceholderText("gemini-1.5-pro")
+        self.edit_model_gemini.setPlaceholderText("gemini-2.5-pro")
         l_cloud.addLayout(self.edit_key_gemini["layout"], 1, 1)
         l_cloud.addWidget(self.edit_model_gemini, 1, 2)
 
@@ -100,7 +100,7 @@ class AiSettingsDialog(QDialog):
         l_cloud.addWidget(QLabel("Anthropic (Claude):"), 2, 0)
         self.edit_key_anthropic = self._create_password_edit("sk-ant-...")
         self.edit_model_anthropic = QLineEdit()
-        self.edit_model_anthropic.setPlaceholderText("claude-3-5-sonnet-20241022")
+        self.edit_model_anthropic.setPlaceholderText("claude-sonnet-5-5")
         l_cloud.addLayout(self.edit_key_anthropic["layout"], 2, 1)
         l_cloud.addWidget(self.edit_model_anthropic, 2, 2)
 
@@ -211,8 +211,8 @@ class AiSettingsDialog(QDialog):
         self.edit_key_deepseek["edit"].setText(keys.get("deepseek", ""))
         self.edit_key_openrouter["edit"].setText(keys.get("openrouter", ""))
 
-        self.edit_model_gemini.setText(models.get("gemini", "gemini-1.5-pro"))
-        self.edit_model_anthropic.setText(models.get("anthropic", "claude-3-5-sonnet-20241022"))
+        self.edit_model_gemini.setText(models.get("gemini", "gemini-2.5-pro"))
+        self.edit_model_anthropic.setText(models.get("anthropic", "claude-sonnet-5-5"))
         self.edit_model_openai.setText(models.get("openai", "gpt-4o"))
         self.edit_model_deepseek.setText(models.get("deepseek", "deepseek-chat"))
         self.edit_model_openrouter.setText(models.get("openrouter", "deepseek/deepseek-chat"))
@@ -224,6 +224,7 @@ class AiSettingsDialog(QDialog):
 
     def _save_and_close(self):
         self.cfg["active_provider"] = self.combo_provider.currentData()
+        self.cfg.setdefault("api_keys", {})
 
         # Keys
         self.cfg["api_keys"]["gemini"] = self.edit_key_gemini["edit"].text().strip()
@@ -235,8 +236,8 @@ class AiSettingsDialog(QDialog):
         # Models
         if "models" not in self.cfg:
             self.cfg["models"] = {}
-        self.cfg["models"]["gemini"] = self.edit_model_gemini.text().strip() or "gemini-1.5-pro"
-        self.cfg["models"]["anthropic"] = self.edit_model_anthropic.text().strip() or "claude-3-5-sonnet-20241022"
+        self.cfg["models"]["gemini"] = self.edit_model_gemini.text().strip() or "gemini-2.5-pro"
+        self.cfg["models"]["anthropic"] = self.edit_model_anthropic.text().strip() or "claude-sonnet-5-5"
         self.cfg["models"]["openai"] = self.edit_model_openai.text().strip() or "gpt-4o"
         self.cfg["models"]["deepseek"] = self.edit_model_deepseek.text().strip() or "deepseek-chat"
         self.cfg["models"]["openrouter"] = self.edit_model_openrouter.text().strip() or "deepseek/deepseek-chat"

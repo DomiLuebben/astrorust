@@ -1,38 +1,98 @@
 use crate::astrology::aspects::calculate_aspects;
+use crate::astrology::chiron::chiron_position;
 use crate::astrology::dignities::calculate_dignity;
 use crate::astrology::interpretations::generate_interpretations;
 use crate::astrology::models::{
-    AnglesData, ChartRequest, ChartResponse, Element, ElementQualitySummary, HouseCuspData,
-    HouseSystemChoice, PlanetData, Quality, ZodiacSign,
+    AnglesData, CelestialPoint, ChartRequest, ChartResponse, Element, ElementQualitySummary,
+    HouseCuspData, HouseSystemChoice, PlanetData, Quality, ZodiacSign,
 };
+use crate::astrology::util::{
+    format_utc_offset, julian_day_ut, split_dm, split_dms, validate_request,
+};
+use std::sync::Once;
+
+static EPHE_INIT: Once = Once::new();
+
+/// Sucht Swiss-Ephemeris-Dateien (`*.se1`) und meldet den Pfad an die C-Bibliothek.
+/// Ohne Dateien rechnet die Bibliothek mit Moshier (für Chiron greift `chiron.rs`).
+fn init_ephemeris() {
+    EPHE_INIT.call_once(|| {
+        let mut candidates: Vec<String> = Vec::new();
+        if let Ok(p) = std::env::var("ASTRORUST_EPHE") {
+            candidates.push(p);
+        }
+        if let Ok(home) = std::env::var("HOME") {
+            candidates.push(format!("{}/.local/share/astrorust/ephe", home));
+        }
+        candidates.push("/usr/share/astrorust/ephe".into());
+        candidates.push("/usr/share/swisseph".into());
+        candidates.push("/usr/share/sweph/ephe".into());
+        for dir in candidates {
+            let has_files = std::fs::read_dir(&dir)
+                .map(|rd| {
+                    rd.flatten()
+                        .any(|e| e.path().extension().map_or(false, |x| x == "se1"))
+                })
+                .unwrap_or(false);
+            if has_files && !dir.contains('\0') {
+                sweph::set_ephe_path(&dir);
+                break;
+            }
+        }
+    });
+}
+
+fn format_angle(sign: ZodiacSign, sign_deg: f64) -> String {
+    let (d, m) = split_dm(sign_deg);
+    format!("{} {:02}° {:02}'", sign.glyph(), d, m)
+}
 
 pub fn calculate_chart(req: &ChartRequest) -> Result<ChartResponse, String> {
-    // 1. Calculate Julian Day UT
+    validate_request(req)?;
+    init_ephemeris();
+
+    // 1. Julianischer Tag (UT)
     let dec_hour = req.hour as f64
         + (req.minute as f64 / 60.0)
         + (req.second.unwrap_or(0) as f64 / 3600.0);
     let ut_hour = dec_hour - req.timezone_offset;
+    let jd_ut = julian_day_ut(req.year, req.month, req.day, ut_hour);
 
-    let jd_ut = sweph::julian_day(req.year, req.month, req.day, ut_hour);
-
-    // 2. Calculate Houses & Angles
-    let house_sys_choice = req.house_system.unwrap_or(HouseSystemChoice::Placidus);
-    let houses_res = sweph::houses(
+    // 2. Häuser & Achsen. Quadrantensysteme sind innerhalb der Polarkreise nicht
+    //    definiert; dann wird – wie in gängiger Software – auf Porphyrius ausgewichen.
+    let requested_system = req.house_system.unwrap_or(HouseSystemChoice::Placidus);
+    let mut house_system_label = requested_system.name_de().to_string();
+    let houses_calc = match sweph::houses(
         jd_ut,
         req.latitude,
         req.longitude,
-        house_sys_choice.to_sweph(),
-    );
+        requested_system.to_sweph(),
+    ) {
+        Ok(h) => h,
+        Err(first_err) => {
+            let fallback = HouseSystemChoice::Porphyry;
+            match sweph::houses(jd_ut, req.latitude, req.longitude, fallback.to_sweph()) {
+                Ok(h) => {
+                    house_system_label = format!(
+                        "{} (Ersatz für {}: am Polarkreis nicht definiert)",
+                        fallback.name_de(),
+                        requested_system.name_de()
+                    );
+                    h
+                }
+                Err(_) => {
+                    return Err(format!("Fehler bei Häuserberechnung: {:?}", first_err));
+                }
+            }
+        }
+    };
 
-    let houses_calc = houses_res.map_err(|e| format!("Fehler bei Häuserberechnung: {:?}", e))?;
-
-    // 3. Prepare Houses Data
+    // 3. Häuserspitzen
     let mut house_cusps = Vec::with_capacity(12);
     for i in 0..12 {
         let cusp_deg = houses_calc.cusps[i].rem_euclid(360.0);
         let (sign, sign_deg) = ZodiacSign::from_degrees(cusp_deg);
-        let deg_int = sign_deg.floor() as u32;
-        let min_int = ((sign_deg - deg_int as f64) * 60.0).round() as u32;
+        let (deg_int, min_int) = split_dm(sign_deg);
         house_cusps.push(HouseCuspData {
             house_number: (i + 1) as u8,
             longitude: cusp_deg,
@@ -45,12 +105,10 @@ pub fn calculate_chart(req: &ChartRequest) -> Result<ChartResponse, String> {
         });
     }
 
-    // 4. Calculate Planets
+    // 4. Planeten
     let mut planets = Vec::new();
-    for &pt in crate::astrology::models::CelestialPoint::all() {
-        let pos_opt = sweph::calc(jd_ut, pt.sweph_body());
-
-        let (lon, lat, dist, speed, is_retro) = match pos_opt {
+    for &pt in CelestialPoint::all() {
+        let (lon, lat, dist, speed, is_retro) = match sweph::calc(jd_ut, pt.sweph_body()) {
             Ok(pos) => (
                 pos.longitude.rem_euclid(360.0),
                 pos.latitude,
@@ -58,11 +116,9 @@ pub fn calculate_chart(req: &ChartRequest) -> Result<ChartResponse, String> {
                 pos.speed_longitude,
                 pos.retrograde(),
             ),
-            Err(_) if pt == crate::astrology::models::CelestialPoint::Chiron => {
-                // Compute Chiron via osculating Keplerian orbital elements
-                let chiron_calc = calculate_chiron_kepler(jd_ut);
-                (chiron_calc.0, chiron_calc.1, chiron_calc.2, chiron_calc.3, chiron_calc.4)
-            }
+            // Ohne seas_18.se1 kennt die Swiss Ephemeris Chiron nicht.
+            Err(_) if pt == CelestialPoint::Chiron => chiron_position(jd_ut)
+                .ok_or_else(|| "Fehler bei Planetenberechnung Chiron".to_string())?,
             Err(e) => {
                 return Err(format!(
                     "Fehler bei Planetenberechnung {}: {:?}",
@@ -73,10 +129,7 @@ pub fn calculate_chart(req: &ChartRequest) -> Result<ChartResponse, String> {
         };
 
         let (sign, sign_deg) = ZodiacSign::from_degrees(lon);
-        let deg_int = sign_deg.floor() as u32;
-        let rem_min = (sign_deg - deg_int as f64) * 60.0;
-        let min_int = rem_min.floor() as u32;
-        let sec_int = ((rem_min - min_int as f64) * 60.0).round() as u32;
+        let (deg_int, min_int, sec_int) = split_dms(sign_deg);
 
         let house_num = determine_house(lon, &houses_calc.cusps);
         let dignity = calculate_dignity(pt, sign);
@@ -103,7 +156,7 @@ pub fn calculate_chart(req: &ChartRequest) -> Result<ChartResponse, String> {
         });
     }
 
-    // 5. Angles and Special Points
+    // 5. Achsen und Sonderpunkte
     let asc_deg = houses_calc.ascendant.rem_euclid(360.0);
     let (asc_sign, asc_sign_deg) = ZodiacSign::from_degrees(asc_deg);
     let mc_deg = houses_calc.midheaven.rem_euclid(360.0);
@@ -117,111 +170,76 @@ pub fn calculate_chart(req: &ChartRequest) -> Result<ChartResponse, String> {
     let vtx_deg = houses_calc.vertex.rem_euclid(360.0);
     let (vtx_sign, vtx_sign_deg) = ZodiacSign::from_degrees(vtx_deg);
 
-    // Part of Fortune
-    let sun_pos = planets
+    // Glückspunkt (Pars Fortunae)
+    let sun_lon = planets
         .iter()
-        .find(|p| p.id == crate::astrology::models::CelestialPoint::Sun)
-        .map(|p| (p.longitude, p.house))
-        .unwrap_or((0.0, 1));
-    let moon_pos = planets
+        .find(|p| p.id == CelestialPoint::Sun)
+        .map(|p| p.longitude)
+        .unwrap_or(0.0);
+    let moon_lon = planets
         .iter()
-        .find(|p| p.id == crate::astrology::models::CelestialPoint::Moon)
+        .find(|p| p.id == CelestialPoint::Moon)
         .map(|p| p.longitude)
         .unwrap_or(0.0);
 
-    // Diurnal if Sun is in houses 7..=12
-    let is_diurnal = sun_pos.1 >= 7 && sun_pos.1 <= 12;
+    // Tageshoroskop: Sonne über dem Horizont, also zwischen DC und AC gegen den
+    // Uhrzeigersinn (180°–360° vom AC aus). Unabhängig vom Häusersystem.
+    let is_diurnal = (sun_lon - asc_deg).rem_euclid(360.0) >= 180.0;
     let fortune_deg = if is_diurnal {
-        (asc_deg + moon_pos - sun_pos.0).rem_euclid(360.0)
+        (asc_deg + moon_lon - sun_lon).rem_euclid(360.0)
     } else {
-        (asc_deg + sun_pos.0 - moon_pos).rem_euclid(360.0)
+        (asc_deg + sun_lon - moon_lon).rem_euclid(360.0)
     };
     let (fort_sign, fort_sign_deg) = ZodiacSign::from_degrees(fortune_deg);
 
     let angles = AnglesData {
         ascendant: asc_deg,
         ascendant_sign: asc_sign,
-        ascendant_formatted: format!(
-            "{} {:02}° {:02}'",
-            asc_sign.glyph(),
-            asc_sign_deg.floor() as u32,
-            ((asc_sign_deg - asc_sign_deg.floor()) * 60.0).round() as u32
-        ),
+        ascendant_formatted: format_angle(asc_sign, asc_sign_deg),
         midheaven: mc_deg,
         midheaven_sign: mc_sign,
-        midheaven_formatted: format!(
-            "{} {:02}° {:02}'",
-            mc_sign.glyph(),
-            mc_sign_deg.floor() as u32,
-            ((mc_sign_deg - mc_sign_deg.floor()) * 60.0).round() as u32
-        ),
+        midheaven_formatted: format_angle(mc_sign, mc_sign_deg),
         descendant: desc_deg,
-        descendant_formatted: format!(
-            "{} {:02}° {:02}'",
-            desc_sign.glyph(),
-            desc_sign_deg.floor() as u32,
-            ((desc_sign_deg - desc_sign_deg.floor()) * 60.0).round() as u32
-        ),
+        descendant_formatted: format_angle(desc_sign, desc_sign_deg),
         imum_coeli: ic_deg,
-        imum_coeli_formatted: format!(
-            "{} {:02}° {:02}'",
-            ic_sign.glyph(),
-            ic_sign_deg.floor() as u32,
-            ((ic_sign_deg - ic_sign_deg.floor()) * 60.0).round() as u32
-        ),
+        imum_coeli_formatted: format_angle(ic_sign, ic_sign_deg),
         part_of_fortune: fortune_deg,
-        part_of_fortune_formatted: format!(
-            "{} {:02}° {:02}'",
-            fort_sign.glyph(),
-            fort_sign_deg.floor() as u32,
-            ((fort_sign_deg - fort_sign_deg.floor()) * 60.0).round() as u32
-        ),
+        part_of_fortune_formatted: format_angle(fort_sign, fort_sign_deg),
         vertex: vtx_deg,
-        vertex_formatted: format!(
-            "{} {:02}° {:02}'",
-            vtx_sign.glyph(),
-            vtx_sign_deg.floor() as u32,
-            ((vtx_sign_deg - vtx_sign_deg.floor()) * 60.0).round() as u32
-        ),
+        vertex_formatted: format_angle(vtx_sign, vtx_sign_deg),
     };
 
-    // 6. Aspects
+    // 6. Aspekte
     let aspects = calculate_aspects(&planets);
 
-    // 7. Element and Quality summary
-    let mut fire = 0;
-    let mut earth = 0;
-    let mut air = 0;
-    let mut water = 0;
-    let mut cardinal = 0;
-    let mut fixed = 0;
-    let mut mutable = 0;
+    // 7. Elemente und Qualitäten: die zehn klassischen Planeten plus Aszendent.
+    //    Mondknoten, Chiron und Lilith sind Empfindlichkeitspunkte und zählen nicht mit.
+    let (mut fire, mut earth, mut air, mut water) = (0, 0, 0, 0);
+    let (mut cardinal, mut fixed, mut mutable) = (0, 0, 0);
 
-    // Weight major planets and Ascendant
-    for p in &planets {
-        match p.sign.element() {
+    let counted_signs = planets
+        .iter()
+        .filter(|p| {
+            !matches!(
+                p.id,
+                CelestialPoint::TrueNode | CelestialPoint::Chiron | CelestialPoint::Lilith
+            )
+        })
+        .map(|p| p.sign)
+        .chain(std::iter::once(asc_sign));
+
+    for sign in counted_signs {
+        match sign.element() {
             Element::Fire => fire += 1,
             Element::Earth => earth += 1,
             Element::Air => air += 1,
             Element::Water => water += 1,
         }
-        match p.sign.quality() {
+        match sign.quality() {
             Quality::Cardinal => cardinal += 1,
             Quality::Fixed => fixed += 1,
             Quality::Mutable => mutable += 1,
         }
-    }
-    // Also include Ascendant sign
-    match asc_sign.element() {
-        Element::Fire => fire += 1,
-        Element::Earth => earth += 1,
-        Element::Air => air += 1,
-        Element::Water => water += 1,
-    }
-    match asc_sign.quality() {
-        Quality::Cardinal => cardinal += 1,
-        Quality::Fixed => fixed += 1,
-        Quality::Mutable => mutable += 1,
     }
 
     let dominant_element = {
@@ -261,12 +279,17 @@ pub fn calculate_chart(req: &ChartRequest) -> Result<ChartResponse, String> {
         dominant_quality,
     };
 
-    // 8. Interpretations
+    // 8. Deutungen
     let interpretations = generate_interpretations(&planets, asc_sign, &aspects, &element_quality);
 
     let date_time_str = format!(
-        "{:04}-{:02}-{:02} {:02}:{:02} (UTC{:+.1})",
-        req.year, req.month, req.day, req.hour, req.minute, req.timezone_offset
+        "{:04}-{:02}-{:02} {:02}:{:02} ({})",
+        req.year,
+        req.month,
+        req.day,
+        req.hour,
+        req.minute,
+        format_utc_offset(req.timezone_offset)
     );
 
     Ok(ChartResponse {
@@ -275,11 +298,12 @@ pub fn calculate_chart(req: &ChartRequest) -> Result<ChartResponse, String> {
         location_name: req
             .location_name
             .clone()
+            .filter(|s| !s.trim().is_empty())
             .unwrap_or_else(|| format!("{:.2}°, {:.2}°", req.latitude, req.longitude)),
         latitude: req.latitude,
         longitude: req.longitude,
         julian_day: jd_ut,
-        house_system: house_sys_choice.name_de().to_string(),
+        house_system: house_system_label,
         planets,
         houses: house_cusps,
         angles,
@@ -302,67 +326,4 @@ fn determine_house(lon: f64, cusps: &[f64; 12]) -> u8 {
         }
     }
     1
-}
-
-fn calculate_chiron_kepler(jd: f64) -> (f64, f64, f64, f64, bool) {
-    let pos_a = chiron_raw_lon(jd);
-    let pos_b = chiron_raw_lon(jd + 0.1);
-
-    let mut d_lon = pos_b.0 - pos_a.0;
-    if d_lon > 180.0 { d_lon -= 360.0; }
-    if d_lon < -180.0 { d_lon += 360.0; }
-    let speed = d_lon / 0.1;
-    let is_retro = speed < 0.0;
-
-    (pos_a.0, pos_a.1, pos_a.2, speed, is_retro)
-}
-
-fn chiron_raw_lon(jd: f64) -> (f64, f64, f64) {
-    let d = jd - 2451545.0; // days from J2000.0
-    let a = 13.670; // AU
-    let e = 0.383;
-    let inc = 6.94_f64.to_radians();
-    let omega = 339.6_f64.to_radians();
-    let big_omega = 209.3_f64.to_radians();
-
-    let n = 0.019538_f64.to_radians(); // mean motion per day
-    let m0 = 126.3_f64.to_radians();
-    let m = (m0 + n * d).rem_euclid(std::f64::consts::TAU);
-
-    // Solve Kepler's equation E - e*sin(E) = M
-    let mut e_anom = m;
-    for _ in 0..10 {
-        let f = e_anom - e * e_anom.sin() - m;
-        let f_prime = 1.0 - e * e_anom.cos();
-        e_anom -= f / f_prime;
-    }
-
-    let nu = 2.0 * (((1.0 + e) / (1.0 - e)).sqrt() * (e_anom / 2.0).tan()).atan();
-    let r = a * (1.0 - e * e_anom.cos());
-
-    let u = nu + omega;
-    let x_h = r * (big_omega.cos() * u.cos() - big_omega.sin() * u.sin() * inc.cos());
-    let y_h = r * (big_omega.sin() * u.cos() + big_omega.cos() * u.sin() * inc.cos());
-    let z_h = r * (u.sin() * inc.sin());
-
-    // Approximate Sun's geocentric position
-    let sun_pos = sweph::calc(jd, sweph::Body::Sun).ok();
-    let (sun_x, sun_y) = if let Some(sp) = sun_pos {
-        let sl = sp.longitude.to_radians();
-        let sr = sp.distance;
-        (sr * sl.cos(), sr * sl.sin())
-    } else {
-        let sun_lon = (280.460 + 0.9856474 * d).rem_euclid(360.0).to_radians();
-        (sun_lon.cos(), sun_lon.sin())
-    };
-
-    let x_g = x_h + sun_x;
-    let y_g = y_h + sun_y;
-    let z_g = z_h;
-
-    let dist = (x_g * x_g + y_g * y_g + z_g * z_g).sqrt();
-    let lon = y_g.atan2(x_g).to_degrees().rem_euclid(360.0);
-    let lat = (z_g / dist).asin().to_degrees();
-
-    (lon, lat, dist)
 }

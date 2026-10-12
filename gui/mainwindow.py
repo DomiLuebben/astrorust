@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtGui import QAction, QFont, QColor
 
+import html
 import json
 import re
 from PyQt6.QtWidgets import QCalendarWidget, QDialog
@@ -30,6 +31,9 @@ import styles
 
 ASTRORUST_CONFIG_DIR = os.path.expanduser("~/.config/astrorust")
 ASTRORUST_PROFILES_PATH = os.path.join(ASTRORUST_CONFIG_DIR, "profiles.json")
+
+# Dieses Demo-Profil wäre ab dem ersten Start eingefroren (Zeit des Erststarts) – dafür gibt es "Jetzt".
+VOLATILE_PROFILE_NAME = "Aktueller Moment (Jetzt)"
 
 DEMO_PROFILE_NAMES = {
     "Albert Einstein",
@@ -68,38 +72,48 @@ class AstroDateEdit(QLineEdit):
         if qdate and qdate.isValid():
             self._current_date = qdate
             self.setText(qdate.toString("yyyy-MM-dd"))
+            self.setStyleSheet("")
+            self.setToolTip("")
 
     def date(self) -> QDate:
         self._parse_text()
         return self._current_date
 
-    def _parse_text(self):
+    def is_valid_input(self) -> bool:
+        """True, wenn der sichtbare Text ein gültiges Datum ergibt (nicht nur das zuletzt gültige)."""
+        return self._parse_text()
+
+    def _parse_text(self) -> bool:
         text = self.text().strip()
         if not text:
-            return
+            return False
 
         # 1. Format: JJJJ-MM-TT / JJJJ.MM.TT / JJJJ/MM/TT
         m = re.match(r"^(\d{3,4})[-/.](\d{1,2})[-/.](\d{1,2})$", text)
         if m:
-            y, mth, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
-            qd = QDate(y, mth, d)
+            qd = QDate(int(m.group(1)), int(m.group(2)), int(m.group(3)))
             if qd.isValid():
                 self._current_date = qd
-                return
+                return True
+            return False
 
         # 2. Format: TT.MM.JJJJ / TT/MM/JJJJ
         m = re.match(r"^(\d{1,2})[-/.](\d{1,2})[-/.](\d{3,4})$", text)
         if m:
-            d, mth, y = int(m.group(1)), int(m.group(2)), int(m.group(3))
-            qd = QDate(y, mth, d)
+            qd = QDate(int(m.group(3)), int(m.group(2)), int(m.group(1)))
             if qd.isValid():
                 self._current_date = qd
-                return
+                return True
+        return False
 
     def _on_editing_finished(self):
-        self._parse_text()
-        if self._current_date.isValid():
+        if self._parse_text():
             self.setText(self._current_date.toString("yyyy-MM-dd"))
+            self.setStyleSheet("")
+            self.setToolTip("")
+        else:
+            self.setStyleSheet(f"border: 1px solid {styles.STOP_RED};")
+            self.setToolTip("Ungültiges Datum – erlaubt: JJJJ-MM-TT oder TT.MM.JJJJ")
 
     def _open_calendar(self):
         self._parse_text()
@@ -140,6 +154,7 @@ class MainWindow(QMainWindow):
 
         self.ai_cfg = AiConfig.load()
         self.ai_worker = None
+        self._retired_workers = []
 
         # Transit animation timer
         self.transit_datetime = datetime.now(timezone.utc)
@@ -150,6 +165,15 @@ class MainWindow(QMainWindow):
         self._init_ui()
         self._load_profiles()
         self._calculate_current()
+
+    def closeEvent(self, event):
+        """Laufende KI-Anfrage sauber beenden, sonst meldet Qt 'QThread destroyed while running'."""
+        self.transit_timer.stop()
+        for worker in [self.ai_worker, *self._retired_workers]:
+            if worker is not None and worker.isRunning():
+                worker.cancel()
+                worker.wait(3000)
+        super().closeEvent(event)
 
     def _init_ui(self):
         # 1. Menüs
@@ -349,7 +373,6 @@ class MainWindow(QMainWindow):
 
         l_nat.addWidget(QLabel("Geburtsort:"), 2, 0)
         self.edit_city = QLineEdit("Ulm, Deutschland")
-        self._setup_city_completer(self.edit_city)
         l_nat.addWidget(self.edit_city, 2, 1, 1, 2)
 
         l_nat.addWidget(QLabel("Breite (°):"), 3, 0)
@@ -372,6 +395,8 @@ class MainWindow(QMainWindow):
         self.spin_tz.setDecimals(2)
         self.spin_tz.setValue(1.0)
         l_nat.addWidget(self.spin_tz, 4, 1)
+
+        self._setup_city_completer(self.edit_city, self.spin_lat, self.spin_lon, self.spin_tz)
 
         l_nat.addWidget(QLabel("Häusersystem:"), 5, 0)
         self.combo_houses = QComboBox()
@@ -404,25 +429,30 @@ class MainWindow(QMainWindow):
 
         l_syn.addWidget(QLabel("Ort:"), 2, 0)
         self.edit_city_b = QLineEdit("Titel, Serbien")
-        self._setup_city_completer(self.edit_city_b)
         l_syn.addWidget(self.edit_city_b, 2, 1, 1, 2)
 
         l_syn.addWidget(QLabel("Breite:"), 3, 0)
         self.spin_lat_b = QDoubleSpinBox()
         self.spin_lat_b.setRange(-90.0, 90.0)
+        self.spin_lat_b.setDecimals(4)
         self.spin_lat_b.setValue(45.2056)
         l_syn.addWidget(self.spin_lat_b, 3, 1)
 
         l_syn.addWidget(QLabel("Länge:"), 3, 2)
         self.spin_lon_b = QDoubleSpinBox()
         self.spin_lon_b.setRange(-180.0, 180.0)
+        self.spin_lon_b.setDecimals(4)
         self.spin_lon_b.setValue(20.0944)
         l_syn.addWidget(self.spin_lon_b, 3, 3)
 
         l_syn.addWidget(QLabel("Zone:"), 4, 0)
         self.spin_tz_b = QDoubleSpinBox()
+        self.spin_tz_b.setRange(-12.0, 14.0)
+        self.spin_tz_b.setDecimals(2)
         self.spin_tz_b.setValue(1.0)
         l_syn.addWidget(self.spin_tz_b, 4, 1)
+
+        self._setup_city_completer(self.edit_city_b, self.spin_lat_b, self.spin_lon_b, self.spin_tz_b)
 
         layout.addWidget(self.box_synastry)
 
@@ -480,7 +510,7 @@ class MainWindow(QMainWindow):
         scroll.setWidget(container)
         return scroll
 
-    def _setup_city_completer(self, line_edit):
+    def _setup_city_completer(self, line_edit, spin_lat, spin_lon, spin_tz):
         cities = self.backend.search_cities("")
         names = [f"{c['name']}, {c['country']}" for c in cities]
         completer = QCompleter(names, line_edit)
@@ -491,9 +521,9 @@ class MainWindow(QMainWindow):
         def on_activated(text):
             for c in cities:
                 if f"{c['name']}, {c['country']}" == text:
-                    self.spin_lat.setValue(c["latitude"])
-                    self.spin_lon.setValue(c["longitude"])
-                    self.spin_tz.setValue(c["default_tz"])
+                    spin_lat.setValue(c["latitude"])
+                    spin_lon.setValue(c["longitude"])
+                    spin_tz.setValue(c["default_tz"])
                     break
         completer.activated.connect(on_activated)
 
@@ -515,10 +545,12 @@ class MainWindow(QMainWindow):
 
         v_head = QVBoxLayout()
         self.lbl_chart_name = QLabel("Albert Einstein")
+        self.lbl_chart_name.setTextFormat(Qt.TextFormat.PlainText)
         self.lbl_chart_name.setStyleSheet(f"font-size: 15px; font-weight: bold; color: {styles.TEXT};")
         v_head.addWidget(self.lbl_chart_name)
 
         self.lbl_chart_meta = QLabel("1879-03-14 11:30 • Ulm, Deutschland • Placidus")
+        self.lbl_chart_meta.setTextFormat(Qt.TextFormat.PlainText)
         self.lbl_chart_meta.setStyleSheet(f"font-size: 11px; color: {styles.TEXT_MUTED};")
         v_head.addWidget(self.lbl_chart_meta)
         h_layout.addLayout(v_head)
@@ -609,6 +641,7 @@ class MainWindow(QMainWindow):
         self.table_transits.setHorizontalHeaderLabels(["Transit", "Aspekt", "Radix", "Orbis"])
         self.table_transits.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.tabs.addTab(self.table_transits, "Transite")
+        self.tabs.setTabVisible(5, False)  # erst im Transit-Modus sichtbar
 
         # Tab 7: 🔮 KI-Deutung (Umfassend & tiefenpsychologisch)
         tab_ai = self._create_ai_tab()
@@ -717,9 +750,24 @@ class MainWindow(QMainWindow):
         self.ai_cfg = AiConfig.load()
         module_key = self.combo_ai_module.currentData()
 
-        # If transit module, ensure transit chart exists
-        tr_chart = self.transit_data if (module_key == "transite" or self.mode == "transit") else None
-        syn_chart = self.transit_data if (module_key == "synastrie" or self.mode == "synastry") else None
+        # Transit- und Partnerdaten getrennt halten: im Synastrie-Modus ist transit_data
+        # das Partner-Horoskop und darf nie als "Transit" in den Prompt gelangen.
+        tr_chart = None
+        syn_chart = None
+        if module_key == "synastrie":
+            syn_chart = self.synastry_data
+            if not syn_chart:
+                QMessageBox.information(
+                    self, "Partnerdaten fehlen",
+                    "Für den Partnervergleich bitte zuerst den Modus „Synastrie“ wählen, "
+                    "die Daten von Person B eintragen und berechnen."
+                )
+                return
+        elif module_key == "transite":
+            tr_chart = self.transit_data if self.mode == "transit" else self._current_transit_chart()
+            if not tr_chart:
+                QMessageBox.warning(self, "Transite", "Die aktuellen Transite konnten nicht berechnet werden.")
+                return
 
         self.btn_ai_generate.setEnabled(False)
         self.btn_ai_cancel.setEnabled(True)
@@ -734,10 +782,37 @@ class MainWindow(QMainWindow):
         self.ai_worker.error_signal.connect(self._on_ai_error)
         self.ai_worker.start()
 
+    def _current_transit_chart(self):
+        """Transit-Horoskop für den jetzigen Zeitpunkt (UTC), falls der Zeitschieber nicht aktiv ist."""
+        now = datetime.now(timezone.utc)
+        try:
+            res = self.backend.calculate_transit({
+                "natal": self._get_request_dict(),
+                "transit_year": now.year,
+                "transit_month": now.month,
+                "transit_day": now.day,
+                "transit_hour": now.hour,
+                "transit_minute": now.minute,
+                "transit_timezone_offset": 0.0,
+            })
+            return res["transit_chart"]
+        except Exception as e:
+            self.statusBar().showMessage(f"Transitberechnung fehlgeschlagen: {e}", 6000)
+            return None
+
     def _cancel_ai_generation(self):
         if self.ai_worker and self.ai_worker.isRunning():
-            self.ai_worker.cancel()
-            self.ai_worker.terminate()
+            worker = self.ai_worker
+            worker.cancel()  # beendet CLI-Prozesse; HTTP-Antworten werden verworfen
+            for sig in (worker.status_signal, worker.finished_signal, worker.error_signal):
+                try:
+                    sig.disconnect()
+                except TypeError:
+                    pass
+            # Thread nicht mit terminate() abwürgen (kann Mutex/Heap beschädigen):
+            # er läuft sauber aus; die Referenz bleibt bis dahin erhalten.
+            self._retired_workers.append(worker)
+            worker.finished.connect(lambda w=worker: self._retired_workers.remove(w) if w in self._retired_workers else None)
             self._reset_ai_ui("Generierung abgebrochen.")
 
     def _on_ai_status(self, msg):
@@ -767,7 +842,7 @@ class MainWindow(QMainWindow):
         txt = self.text_ai_output.toPlainText()
         if not txt:
             return
-        name = self.chart_data.get("name", "Horoskop")
+        name = re.sub(r'[\\/:*?"<>|]+', "_", self.chart_data.get("name", "Horoskop")).strip() or "Horoskop"
         fn, _ = QFileDialog.getSaveFileName(
             self, "Deutung als Text speichern", f"{name}_Deutung.md", "Markdown (*.md);;Textdatei (*.txt)"
         )
@@ -786,13 +861,21 @@ class MainWindow(QMainWindow):
             try:
                 with open(ASTRORUST_PROFILES_PATH, "r", encoding="utf-8") as f:
                     self.saved_profiles = json.load(f)
+                if not isinstance(self.saved_profiles, list):
+                    raise ValueError("profiles.json enthält keine Profilliste")
+                self.saved_profiles = [
+                    p for p in self.saved_profiles
+                    if isinstance(p, dict) and p.get("name") != VOLATILE_PROFILE_NAME
+                ]
             except Exception as e:
                 print("Fehler beim Laden von profiles.json:", e)
                 self.saved_profiles = []
         else:
             # Erster Start: Demo-Profile aus Backend als Initialbestand laden & persistieren
             try:
-                self.saved_profiles = self.backend.get_profiles()
+                self.saved_profiles = [
+                    p for p in self.backend.get_profiles() if p.get("name") != VOLATILE_PROFILE_NAME
+                ]
                 self._save_profiles_to_disk()
             except Exception:
                 self.saved_profiles = []
@@ -919,7 +1002,7 @@ class MainWindow(QMainWindow):
         demos = self.backend.get_profiles()
         existing_names = {p.get("name") for p in self.saved_profiles}
         for d in demos:
-            if d.get("name") not in existing_names:
+            if d.get("name") != VOLATILE_PROFILE_NAME and d.get("name") not in existing_names:
                 self.saved_profiles.append(d)
         self._save_profiles_to_disk()
         self._refresh_profiles_ui()
@@ -973,6 +1056,17 @@ class MainWindow(QMainWindow):
         }
 
     def _calculate_current(self):
+        checks = [("Geburtsdatum", self.edit_date)]
+        if self.mode == "synastry":
+            checks.append(("Datum von Person B", self.edit_date_b))
+        for label, edit in checks:
+            if not edit.is_valid_input():
+                QMessageBox.warning(
+                    self, "Ungültiges Datum",
+                    f"{label}: „{edit.text()}“ ist kein gültiges Datum.\nErlaubt sind JJJJ-MM-TT oder TT.MM.JJJJ."
+                )
+                edit.setFocus()
+                return
         req = self._get_request_dict()
         try:
             self.chart_data = self.backend.calculate_chart(req)
@@ -1138,14 +1232,15 @@ class MainWindow(QMainWindow):
         self.l_elem.addStretch()
 
     def _render_interpretations(self, interps):
-        html = ""
+        doc = ""
         for sec in interps:
-            html += f"<h3 style='color:{styles.ACCENT}; margin-bottom:2px;'>{sec.get('title')}</h3>"
-            html += f"<div style='color:{styles.TEXT_MUTED}; font-size:10px; text-transform:uppercase;'>{sec.get('subtitle')}</div>"
-            html += f"<p style='margin-top:4px; line-height:1.4;'>{sec.get('text')}</p>"
-            tags = " • ".join(sec.get("keywords", []))
-            html += f"<div style='color:{styles.COLOR_AIR}; font-size:10px; margin-bottom:12px;'>Schlagwörter: {tags}</div><hr style='border:none; border-bottom:1px solid {styles.BORDER_SOFT};'>"
-        self.text_deutung.setHtml(html)
+            esc = lambda v: html.escape(str(v if v is not None else ""))
+            doc += f"<h3 style='color:{styles.ACCENT}; margin-bottom:2px;'>{esc(sec.get('title'))}</h3>"
+            doc += f"<div style='color:{styles.TEXT_MUTED}; font-size:10px; text-transform:uppercase;'>{esc(sec.get('subtitle'))}</div>"
+            doc += f"<p style='margin-top:4px; line-height:1.4;'>{esc(sec.get('text'))}</p>"
+            tags = " • ".join(esc(k) for k in sec.get("keywords", []))
+            doc += f"<div style='color:{styles.COLOR_AIR}; font-size:10px; margin-bottom:12px;'>Schlagwörter: {tags}</div><hr style='border:none; border-bottom:1px solid {styles.BORDER_SOFT};'>"
+        self.text_deutung.setHtml(doc)
 
     def _on_wheel_planet_selected(self, planet):
         for row in range(self.table_planets.rowCount()):
@@ -1224,7 +1319,7 @@ class MainWindow(QMainWindow):
                 self.table_transits.setItem(row, 3, QTableWidgetItem(asp["formatted_orb"]))
 
         except Exception as e:
-            print("Transit Fehler:", e)
+            self.statusBar().showMessage(f"Transitberechnung fehlgeschlagen: {e}", 6000)
 
     # ========================================================
     # Synastrie
@@ -1255,8 +1350,8 @@ class MainWindow(QMainWindow):
 
         try:
             res = self.backend.calculate_synastry(req)
-            self.transit_data = res["chart_b"]
-            self.chart_wheel.set_data(self.chart_data, self.transit_data, "synastry")
+            self.synastry_data = res["chart_b"]
+            self.chart_wheel.set_data(self.chart_data, self.synastry_data, "synastry")
             self._render_interpretations(res.get("compatibility_notes", []))
             self.tabs.setCurrentIndex(4)
         except Exception as e:
@@ -1296,10 +1391,13 @@ class MainWindow(QMainWindow):
             self.chart_wheel.set_data(self.chart_data, None, "radix")
 
     def _set_now(self):
-        now = datetime.now()
+        now = datetime.now().astimezone()
+        offset = now.utcoffset().total_seconds() / 3600.0 if now.utcoffset() else 0.0
         self.edit_name.setText("Aktueller Moment")
         self.edit_date.setDate(QDate(now.year, now.month, now.day))
         self.edit_time.setTime(QTime(now.hour, now.minute))
+        # Ortszeit des Rechners samt Sommerzeit; ohne passenden Offset wäre das Horoskop um Stunden verschoben.
+        self.spin_tz.setValue(offset)
         self._calculate_current()
 
     # ========================================================
@@ -1310,9 +1408,10 @@ class MainWindow(QMainWindow):
         req = self._get_request_dict()
         try:
             svg_text = self.backend.export_svg(req)
+            safe_name = re.sub(r'[\\/:*?"<>|]+', "_", req["name"]).strip() or "Horoskop"
             filename, _ = QFileDialog.getSaveFileName(
                 self, "Horoskop als SVG exportieren",
-                f"{req['name']}_Radix.svg", "SVG Vektorgrafik (*.svg)"
+                f"{safe_name}_Radix.svg", "SVG Vektorgrafik (*.svg)"
             )
             if filename:
                 with open(filename, "w", encoding="utf-8") as f:
@@ -1329,7 +1428,7 @@ class MainWindow(QMainWindow):
             "<p><b>Professionelle Astrologie- und Ephemeriden-Software</b></p>"
             "<p>Entwickelt in <b>Rust</b> und nativer <b>Qt6</b>-Oberfläche nach dem Breeze-Dark-Design des Linux Media Encoders.</p>"
             "<p><b>Features & KI-Integration:</b><br>"
-            "• Swiss Ephemeris 2.10 (Moshier & Kepler Algorithmen)<br>"
+            "• Swiss Ephemeris 2.10 (Moshier; Chiron aus JPL-Bahnelementen)<br>"
             "• Gestochen scharfes QPainter Horoskop-Rad<br>"
             "• Multi-Provider KI-Deutungen (Claude CLI, Codex CLI, Ollama, API-Keys, GenOffice-Import)<br>"
             "• Zeitschieber &amp; Transitanalyse</p>"

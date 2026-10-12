@@ -1,6 +1,7 @@
 pub mod aspects;
 pub mod atlas;
 pub mod calculator;
+pub mod chiron;
 pub mod dignities;
 pub mod interpretations;
 pub mod models;
@@ -8,3 +9,4 @@ pub mod profiles;
 pub mod svg_export;
 pub mod synastry;
 pub mod transits;
+pub mod util;

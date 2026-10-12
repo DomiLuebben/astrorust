@@ -1,4 +1,5 @@
 use crate::astrology::calculator::calculate_chart;
+use crate::astrology::util::format_orb;
 use crate::astrology::models::{
     AspectType, ChartRequest, TransitRequest, TransitResponse, TransitToNatalAspect,
 };
@@ -47,9 +48,7 @@ pub fn calculate_transits(req: &TransitRequest) -> Result<TransitResponse, Strin
 
                 // Transit aspects typically have an orb of 2.0° - 3.0°
                 if orb <= 2.5 {
-                    let deg = orb.floor() as u32;
-                    let min = ((orb - orb.floor()) * 60.0).round() as u32;
-                    let formatted_orb = format!("{:02}°{:02}'", deg, min);
+                    let formatted_orb = format_orb(orb);
 
                     transit_aspects.push(TransitToNatalAspect {
                         transit_point: t_planet.id,

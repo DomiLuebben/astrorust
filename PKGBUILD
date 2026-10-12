@@ -1,7 +1,7 @@
 # Maintainer: Dominik Lübben <dominikluebben@googlemail.com>
 pkgname=astrorust
-pkgver=1.0.0
-pkgrel=3
+pkgver=1.0.1
+pkgrel=1
 pkgdesc="Professionelle Astrologie- und Ephemeriden-Software in Rust und Qt6"
 arch=('x86_64')
 url="https://github.com/DomiLuebben/astrorust"

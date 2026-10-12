@@ -3,10 +3,13 @@
 Astrorust — KI-Deutungsengine (Multi-Provider: Claude CLI, Codex CLI, Ollama, API-Keys, GenOffice-Import)
 """
 
+import copy
 import json
 import os
 import shutil
+import signal
 import subprocess
+import urllib.parse
 import urllib.request
 import urllib.error
 import ssl
@@ -33,9 +36,9 @@ class AiConfig:
             "custom": "",
         },
         "models": {
-            "anthropic": "claude-3-5-sonnet-20241022",
+            "anthropic": "claude-sonnet-5-5",
             "openai": "gpt-4o",
-            "gemini": "gemini-1.5-pro",
+            "gemini": "gemini-2.5-pro",
             "openrouter": "deepseek/deepseek-chat",
             "deepseek": "deepseek-chat",
         }
@@ -48,15 +51,20 @@ class AiConfig:
             try:
                 with open(ASTRORUST_AI_SETTINGS, "r", encoding="utf-8") as f:
                     cfg = json.load(f)
-                    # Merge defaults
-                    merged = dict(cls.DEFAULT_CONFIG)
-                    merged.update(cfg)
-                    return merged
+                # Tiefes Mergen: neue Standard-Schlüssel (z. B. ein später ergänzter Provider)
+                # tauchen auch in alten Konfigurationsdateien auf; DEFAULT_CONFIG bleibt unverändert.
+                merged = copy.deepcopy(cls.DEFAULT_CONFIG)
+                for key, value in cfg.items():
+                    if isinstance(value, dict) and isinstance(merged.get(key), dict):
+                        merged[key].update(value)
+                    else:
+                        merged[key] = value
+                return merged
             except Exception as e:
                 print("Fehler beim Laden der KI-Einstellungen:", e)
 
-        # First run: initialize with defaults
-        cfg = dict(cls.DEFAULT_CONFIG)
+        # Erster Start: mit Standardwerten initialisieren
+        cfg = copy.deepcopy(cls.DEFAULT_CONFIG)
         cls.save(cfg)
         return cfg
 
@@ -64,8 +72,12 @@ class AiConfig:
     def save(cls, config_dict):
         os.makedirs(ASTRORUST_CONFIG_DIR, exist_ok=True)
         try:
-            with open(ASTRORUST_AI_SETTINGS, "w", encoding="utf-8") as f:
+            # API-Schlüssel stehen im Klartext in der Datei: nur für den Benutzer lesbar anlegen
+            # (ohne dieses Flag erzeugt open() sie mit 0644, also weltlesbar).
+            fd = os.open(ASTRORUST_AI_SETTINGS, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
                 json.dump(config_dict, f, indent=2, ensure_ascii=False)
+            os.chmod(ASTRORUST_AI_SETTINGS, 0o600)
         except Exception as e:
             print("Fehler beim Speichern der KI-Einstellungen:", e)
 
@@ -230,9 +242,25 @@ class AiGenerationWorker(QThread):
         self.transit_chart = transit_chart
         self.synastry_chart = synastry_chart
         self._is_cancelled = False
+        self._proc = None
 
     def cancel(self):
+        """Bricht ab: laufende CLI-Prozesse werden beendet, Ergebnisse später verworfen."""
         self._is_cancelled = True
+        proc = self._proc
+        if proc is not None and proc.poll() is None:
+            self._kill_process_group(proc)
+
+    @staticmethod
+    def _kill_process_group(proc):
+        """Beendet den CLI-Prozess samt Kindprozessen (Node/Shell-Wrapper halten sonst die Pipe offen)."""
+        try:
+            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+        except (OSError, ProcessLookupError):
+            try:
+                proc.kill()
+            except OSError:
+                pass
 
     def run(self):
         try:
@@ -292,110 +320,121 @@ class AiGenerationWorker(QThread):
             if self._is_cancelled:
                 return
 
+            if not (res or "").strip():
+                raise RuntimeError("Der KI-Provider hat eine leere Antwort geliefert.")
+
             self.finished_signal.emit(res)
         except Exception as e:
             if not self._is_cancelled:
                 self.error_signal.emit(str(e))
 
+    def _run_cli(self, binary, args, label):
+        self.status_signal.emit(f"{label} generiert Deutung...")
+        self._proc = subprocess.Popen(
+            [binary, *args], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+            start_new_session=True,
+        )
+        try:
+            stdout, stderr = self._proc.communicate(timeout=600)
+        except subprocess.TimeoutExpired:
+            self._kill_process_group(self._proc)
+            self._proc.communicate()
+            raise RuntimeError(f"{label} hat nach 10 Minuten nicht geantwortet.")
+        finally:
+            returncode = self._proc.returncode
+            self._proc = None
+
+        if self._is_cancelled:
+            return ""
+        if returncode != 0:
+            raise RuntimeError(f"{label} Fehler ({returncode}): {stderr.strip() or stdout.strip()}")
+        return stdout.strip()
+
     def _run_claude_cli(self, prompt):
         claude_bin = shutil.which("claude") or os.path.expanduser("~/.local/bin/claude")
         if not os.path.exists(claude_bin):
             raise FileNotFoundError("Claude CLI nicht gefunden unter ~/.local/bin/claude oder PATH.")
-
-        self.status_signal.emit("Claude Code generiert Deutung...")
-        cmd = [claude_bin, "-p", prompt]
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        stdout, stderr = proc.communicate()
-
-        if proc.returncode != 0:
-            raise RuntimeError(f"Claude CLI Fehler ({proc.returncode}): {stderr.strip() or stdout.strip()}")
-        return stdout.strip()
+        return self._run_cli(claude_bin, ["-p", prompt], "Claude CLI")
 
     def _run_codex_cli(self, prompt):
         codex_bin = shutil.which("codex") or os.path.expanduser("~/.local/bin/codex")
         if not os.path.exists(codex_bin):
             raise FileNotFoundError("Codex CLI nicht gefunden unter ~/.local/bin/codex oder PATH.")
+        return self._run_cli(codex_bin, ["exec", prompt], "Codex CLI")
 
-        self.status_signal.emit("Codex CLI generiert Deutung...")
-        cmd = [codex_bin, "exec", prompt]
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        stdout, stderr = proc.communicate()
-
-        if proc.returncode != 0:
-            raise RuntimeError(f"Codex CLI Fehler ({proc.returncode}): {stderr.strip() or stdout.strip()}")
-        return stdout.strip()
+    @staticmethod
+    def _post_json(url, payload, headers=None, timeout=120):
+        """POST mit JSON; bei HTTP-Fehlern steht der Antworttext der API in der Meldung."""
+        all_headers = {"Content-Type": "application/json"}
+        all_headers.update(headers or {})
+        req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), headers=all_headers)
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            body = ""
+            try:
+                body = e.read().decode("utf-8", errors="replace")[:600]
+            except Exception:
+                pass
+            raise RuntimeError(f"HTTP {e.code} von {urllib.parse.urlparse(url).netloc}: {body or e.reason}")
+        except urllib.error.URLError as e:
+            raise RuntimeError(f"Verbindung zu {urllib.parse.urlparse(url).netloc} fehlgeschlagen: {e.reason}")
 
     def _run_ollama(self, prompt):
-        url = self.cfg.get("ollama_url", "http://127.0.0.1:11434").rstrip("/") + "/api/generate"
+        base = self.cfg.get("ollama_url", "http://127.0.0.1:11434").rstrip("/")
         model = self.cfg.get("ollama_model", "mistral")
-        payload = json.dumps({"model": model, "prompt": prompt, "stream": False}).encode("utf-8")
-
-        req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            return data.get("response", "")
+        # Ist das eingestellte Modell nicht installiert, nimmt Ollama-Auto-Detect das erste vorhandene.
+        try:
+            installed = detect_environment()["ollama_models"] if base.endswith(":11434") else []
+        except Exception:
+            installed = []
+        if installed and model not in installed and f"{model}:latest" not in installed:
+            model = installed[0]
+            self.status_signal.emit(f"Eingestelltes Modell fehlt, nutze {model}...")
+        data = self._post_json(base + "/api/generate", {"model": model, "prompt": prompt, "stream": False}, timeout=600)
+        return data.get("response", "")
 
     def _run_anthropic_api(self, prompt):
         key = self.cfg.get("api_keys", {}).get("anthropic")
         if not key:
             raise ValueError("Kein Anthropic API-Schlüssel hinterlegt.")
-
-        model = self.cfg.get("models", {}).get("anthropic", "claude-3-5-sonnet-20241022")
-        url = "https://api.anthropic.com/v1/messages"
-        payload = json.dumps({
-            "model": model,
-            "max_tokens": 4096,
-            "messages": [{"role": "user", "content": prompt}]
-        }).encode("utf-8")
-
-        headers = {
-            "Content-Type": "application/json",
-            "x-api-key": key,
-            "anthropic-version": "2023-06-01",
-        }
-        req = urllib.request.Request(url, data=payload, headers=headers)
-        with urllib.request.urlopen(req, timeout=90) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            return data.get("content", [{}])[0].get("text", "")
+        model = self.cfg.get("models", {}).get("anthropic", "claude-sonnet-5-5")
+        data = self._post_json(
+            "https://api.anthropic.com/v1/messages",
+            {"model": model, "max_tokens": 4096, "messages": [{"role": "user", "content": prompt}]},
+            {"x-api-key": key, "anthropic-version": "2023-06-01"},
+            timeout=180,
+        )
+        return "".join(block.get("text", "") for block in data.get("content", []) if block.get("type") == "text")
 
     def _run_openai_api(self, prompt):
         key = self.cfg.get("api_keys", {}).get("openai")
         if not key:
             raise ValueError("Kein OpenAI API-Schlüssel hinterlegt.")
-
         model = self.cfg.get("models", {}).get("openai", "gpt-4o")
-        url = "https://api.openai.com/v1/chat/completions"
-        payload = json.dumps({
-            "model": model,
-            "messages": [{"role": "user", "content": prompt}],
-            "temperature": 0.7
-        }).encode("utf-8")
-
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {key}",
-        }
-        req = urllib.request.Request(url, data=payload, headers=headers)
-        with urllib.request.urlopen(req, timeout=90) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            return data.get("choices", [{}])[0].get("message", {}).get("content", "")
+        data = self._post_json(
+            "https://api.openai.com/v1/chat/completions",
+            {"model": model, "messages": [{"role": "user", "content": prompt}], "temperature": 0.7},
+            {"Authorization": f"Bearer {key}"},
+            timeout=180,
+        )
+        return (data.get("choices") or [{}])[0].get("message", {}).get("content", "")
 
     def _run_gemini_api(self, prompt):
         key = self.cfg.get("api_keys", {}).get("gemini")
         if not key:
             raise ValueError("Kein Google Gemini API-Schlüssel hinterlegt.")
-
-        model = self.cfg.get("models", {}).get("gemini", "gemini-1.5-pro")
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
-        payload = json.dumps({
-            "contents": [{"parts": [{"text": prompt}]}]
-        }).encode("utf-8")
-
-        headers = {"Content-Type": "application/json"}
-        req = urllib.request.Request(url, data=payload, headers=headers)
-        with urllib.request.urlopen(req, timeout=90) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            return data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+        model = self.cfg.get("models", {}).get("gemini", "gemini-2.5-pro")
+        # Schlüssel im Header statt in der URL: URLs landen in Logs und Fehlermeldungen.
+        data = self._post_json(
+            f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+            {"contents": [{"parts": [{"text": prompt}]}]},
+            {"x-goog-api-key": key},
+            timeout=180,
+        )
+        parts = ((data.get("candidates") or [{}])[0].get("content") or {}).get("parts") or []
+        return "".join(part.get("text", "") for part in parts)
 
     def _run_custom_api(self, prompt, provider_name):
         key = self.cfg.get("api_keys", {}).get(provider_name, "")
@@ -409,17 +448,11 @@ class AiGenerationWorker(QThread):
             url = self.cfg.get("custom_url", "http://127.0.0.1:1234/v1").rstrip("/") + "/chat/completions"
             model = self.cfg.get("custom_model", "local-model")
 
-        payload = json.dumps({
-            "model": model,
-            "messages": [{"role": "user", "content": prompt}],
-            "temperature": 0.7
-        }).encode("utf-8")
-
-        headers = {"Content-Type": "application/json"}
-        if key:
-            headers["Authorization"] = f"Bearer {key}"
-
-        req = urllib.request.Request(url, data=payload, headers=headers)
-        with urllib.request.urlopen(req, timeout=90) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            return data.get("choices", [{}])[0].get("message", {}).get("content", "")
+        headers = {"Authorization": f"Bearer {key}"} if key else {}
+        data = self._post_json(
+            url,
+            {"model": model, "messages": [{"role": "user", "content": prompt}], "temperature": 0.7},
+            headers,
+            timeout=300,
+        )
+        return (data.get("choices") or [{}])[0].get("message", {}).get("content", "")

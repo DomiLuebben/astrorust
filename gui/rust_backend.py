@@ -30,11 +30,14 @@ class RustBackend:
             "/usr/local/lib/libastrorust.so",
         ]
 
+        # Mehrere Treffer (z. B. debug + release): die zuletzt gebaute Bibliothek gewinnt,
+        # sonst läuft die GUI gegen eine veraltete Debug-Datei.
+        existing = [p for p in candidates if os.path.exists(p)]
         lib_path = None
-        for path in candidates:
-            if os.path.exists(path):
-                lib_path = path
-                break
+        if existing:
+            project_builds = [p for p in existing if p.startswith(base_dir)]
+            pool = project_builds or existing
+            lib_path = max(pool, key=os.path.getmtime)
 
         if not lib_path:
             raise RuntimeError(
@@ -77,7 +80,7 @@ class RustBackend:
 
         raw_ptr = func(*c_args)
         if not raw_ptr:
-            return None
+            raise RuntimeError("Die Rust-Bibliothek lieferte keine Antwort.")
 
         try:
             val_bytes = ctypes.string_at(raw_ptr)
@@ -86,26 +89,20 @@ class RustBackend:
         finally:
             self.lib.astrorust_free_string(raw_ptr)
 
-    def calculate_chart(self, req_dict: dict) -> dict:
-        res_str = self._call_c_func(self.lib.astrorust_calculate_chart, req_dict)
-        data = json.loads(res_str)
-        if "error" in data:
+    def _call_json(self, func, req_dict):
+        data = json.loads(self._call_c_func(func, req_dict))
+        if isinstance(data, dict) and "error" in data:
             raise ValueError(data["error"])
         return data
+
+    def calculate_chart(self, req_dict: dict) -> dict:
+        return self._call_json(self.lib.astrorust_calculate_chart, req_dict)
 
     def calculate_transit(self, req_dict: dict) -> dict:
-        res_str = self._call_c_func(self.lib.astrorust_calculate_transit, req_dict)
-        data = json.loads(res_str)
-        if "error" in data:
-            raise ValueError(data["error"])
-        return data
+        return self._call_json(self.lib.astrorust_calculate_transit, req_dict)
 
     def calculate_synastry(self, req_dict: dict) -> dict:
-        res_str = self._call_c_func(self.lib.astrorust_calculate_synastry, req_dict)
-        data = json.loads(res_str)
-        if "error" in data:
-            raise ValueError(data["error"])
-        return data
+        return self._call_json(self.lib.astrorust_calculate_synastry, req_dict)
 
     def get_profiles(self) -> list:
         res_str = self._call_c_func(self.lib.astrorust_get_profiles)
@@ -116,4 +113,5 @@ class RustBackend:
         return json.loads(res_str)
 
     def export_svg(self, req_dict: dict) -> str:
-        return self._call_c_func(self.lib.astrorust_export_svg, req_dict)
+        # Die Bibliothek liefert den SVG-Text als JSON-String, Fehler als {"error": ...}.
+        return self._call_json(self.lib.astrorust_export_svg, req_dict)

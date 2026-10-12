@@ -12,7 +12,7 @@ pub fn get_preset_profiles() -> Vec<ChartRequest> {
             hour: 11,
             minute: 30,
             second: Some(0),
-            timezone_offset: 1.0,
+            timezone_offset: 0.67, // Ortszeit Ulm (LMT), 9,99° E
             latitude: 48.4011,
             longitude: 9.9876,
             location_name: Some("Ulm, Deutschland".into()),
@@ -40,7 +40,7 @@ pub fn get_preset_profiles() -> Vec<ChartRequest> {
             hour: 19,
             minute: 20,
             second: Some(0),
-            timezone_offset: 1.0,
+            timezone_offset: 0.62, // Ortszeit Kesswil (LMT), 9,32° E
             latitude: 47.5954,
             longitude: 9.3175,
             location_name: Some("Kesswil, Schweiz".into()),

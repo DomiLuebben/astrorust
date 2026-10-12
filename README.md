@@ -13,7 +13,7 @@ Astrorust kombiniert die Zuverlässigkeit und Geschwindigkeit von **Rust** mit e
 * **🪐 Swiss Ephemeris 2.10.03 Core (`sweph`):**
   * Auf Bogensekunden genaue Planetenpositionen und Häuserspitzen.
   * Alle 10 klassischen Planeten (☉ Sonne, ☽ Mond, ☿ Merkur, ♀ Venus, ♂ Mars, ♃ Jupiter, ♄ Saturn, ♅ Uranus, ♆ Neptun, ♇ Pluto).
-  * ☊ Wahrer Mondknoten, ⚷ Chiron (Kepler-Orbitalmodell) und ⚸ Lilith (Mittleres Apogäum).
+  * ☊ Wahrer Mondknoten, ⚷ Chiron (mit `seas_18.se1` exakt, sonst aus JPL-Bahnelementen auf ±0,03° genau) und ⚸ Lilith (Mittleres Apogäum).
   * 8 Häusersysteme: Placidus, Koch, Regiomontanus, Campanus, Ganzzeichen (Whole Sign), Äqual, Topozentrisch, Porphyrius.
   * 10 Aspektarten mit konfigurierbaren Orben und Applikativ/Separativ-Status.
   * Klassische Würden-Matrix (Domizil, Erhöhung, Fall, Exil).
@@ -25,7 +25,7 @@ Astrorust kombiniert die Zuverlässigkeit und Geschwindigkeit von **Rust** mit e
   * **Vektor-Horoskoprad (`QPainter`):** Gestochen scharfe Vektorgrafik mit Anti-Aliasing, 360°-Skala, Elementarfarben, Anti-Kollisions-Zeigern bei Stellien und interaktiven Tooltips beim Hovern über Planeten und Aspekte.
   * **⏳ Zeitschieber / Time Travel:** Scrubber-Regler, Sprung-Tasten (`±10m`, `±1h`, `±1T`, `±1M`, `±1J`) und animierter Play-Modus zur visuellen Beobachtung von Planetenwanderungen in Echtzeit.
   * **SVG-Export:** Export des aktuellen Radixrades als Vektorgrafik auf Knopfdruck.
-  * **Integrierter Orts-Atlas:** Koordinaten- und Zeitzonensuche für über 100 Städte weltweit.
+  * **Integrierter Orts-Atlas:** Koordinaten- und Zeitzonensuche für über 40 Städte (Zeitzone = heutige Standardzeit; für Geburten früherer Jahre und Sommerzeit bitte prüfen).
 
 * **🔮 Multi-Provider KI-Deutungsengine (Astroplus-Parität):**
   * **Lokale KIs & CLIs:** Automatische Erkennung von Claude Code CLI (`claude`), Codex CLI (`codex`), lokalem Ollama (`http://127.0.0.1:11434`) oder LM Studio / vLLM.
@@ -38,6 +38,16 @@ Astrorust kombiniert die Zuverlässigkeit und Geschwindigkeit von **Rust** mit e
     5. 🪐 *Karma, Seelenplan & Schattenarbeit* (Saturn, Chiron, Lilith, Mondknoten)
     6. ⏳ *Aktuelle Transite & Zeitqualität* (Jahresvorschau)
     7. 👥 *Partnervergleich & Beziehungsdynamik* (Synastrie)
+
+---
+
+## 🎯 Genauigkeit, Kalender & Ephemeridendateien
+
+* **Ohne Datendateien** rechnet die Swiss Ephemeris mit dem analytischen Moshier-Modell (Planeten ≈ 1″). **Chiron** braucht eigentlich `seas_18.se1`; fehlt die Datei, nutzt Astrorust eine Tabelle osculierender JPL-Bahnelemente (1700–2150, Abweichung ≤ 0,03° gegen JPL Horizons, außerhalb des Bereichs weniger genau).
+* **Mit Datendateien:** `*.se1`-Dateien von [astro.com/swisseph](https://www.astro.com/ftp/swisseph/ephe/) in `~/.local/share/astrorust/ephe/` (oder `/usr/share/astrorust/ephe/`, oder per `ASTRORUST_EPHE=/pfad`) ablegen – sie werden beim Start automatisch gefunden.
+* **Kalender:** Daten **vor dem 15.10.1582** gelten als **Julianisch** (wie historisch üblich), danach Gregorianisch.
+* **Zeitzone:** Das Feld „Zone“ ist der Abstand zu UTC in Stunden für den Geburtszeitpunkt. Vor Einführung der Zonenzeit gilt die **Ortszeit (LMT)**: Länge/15 (z. B. Ulm 9,99° E → +0,67).
+* **Polarkreis:** Placidus/Koch sind dort nicht definiert; Astrorust weicht dann auf Porphyrius aus und weist im Häusersystem darauf hin.
 
 ---
 

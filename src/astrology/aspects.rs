@@ -1,4 +1,5 @@
-use crate::astrology::models::{AspectData, AspectType, PlanetData};
+use crate::astrology::models::{AspectData, AspectType, CelestialPoint, PlanetData};
+use crate::astrology::util::format_orb;
 
 pub fn calculate_aspects(planets: &[PlanetData]) -> Vec<AspectData> {
     let aspect_types = [
@@ -30,20 +31,21 @@ pub fn calculate_aspects(planets: &[PlanetData]) -> Vec<AspectData> {
                 let target = asp.target_angle();
                 let orb = (diff - target).abs();
 
-                // Dynamic max orb: widen slightly for Sun/Moon (up to +1.5°), tighter for Chiron/Nodes
+                // Orbis: Sonne und Mond bekommen +1,5°; Mondknoten, Chiron und Lilith
+                // (ohne Sonne/Mond) werden um 1,5° enger gefasst, mindestens aber 1°.
+                let is_luminary = |id: CelestialPoint| matches!(id, CelestialPoint::Sun | CelestialPoint::Moon);
+                let is_minor = |id: CelestialPoint| {
+                    matches!(id, CelestialPoint::TrueNode | CelestialPoint::Chiron | CelestialPoint::Lilith)
+                };
                 let mut max_orb = asp.default_orb();
-                if p1.id == crate::astrology::models::CelestialPoint::Sun
-                    || p1.id == crate::astrology::models::CelestialPoint::Moon
-                    || p2.id == crate::astrology::models::CelestialPoint::Sun
-                    || p2.id == crate::astrology::models::CelestialPoint::Moon
-                {
+                if is_luminary(p1.id) || is_luminary(p2.id) {
                     max_orb += 1.5;
+                } else if is_minor(p1.id) || is_minor(p2.id) {
+                    max_orb = (max_orb - 1.5).max(1.0);
                 }
 
                 if orb <= max_orb {
-                    let deg = orb.floor() as u32;
-                    let min = ((orb - orb.floor()) * 60.0).round() as u32;
-                    let formatted_orb = format!("{:02}°{:02}'", deg, min);
+                    let formatted_orb = format_orb(orb);
 
                     // Determine applying vs separating:
                     // If p1 is faster than p2, check if distance to exact is decreasing

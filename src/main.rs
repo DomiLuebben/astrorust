@@ -6,7 +6,7 @@ use std::process::Command;
 #[derive(Parser, Debug)]
 #[command(name = "astrorust")]
 #[command(author = "Astrorust Desktop")]
-#[command(version = "1.0.0")]
+#[command(version)]
 #[command(about = "Professionelle Astrologie- und Horoskop-Software in Rust & Qt6", long_about = None)]
 pub struct CliArgs {
     /// Native Qt6 GUI starten (Standard)
@@ -84,12 +84,17 @@ fn start_native_qt_gui() -> Result<(), Box<dyn std::error::Error>> {
     println!("\x1b[0m");
     println!("  \x1b[32m✔\x1b[0m Starte native Qt6-Oberfläche (KDE Breeze Dark / LME Design)...");
 
+    if !std::path::Path::new(&gui_script).exists() {
+        return Err(format!("GUI-Skript nicht gefunden: {}", gui_script).into());
+    }
+
     let status = Command::new("python3")
         .arg(&gui_script)
         .status()?;
 
     if !status.success() {
         eprintln!("Qt-GUI beendet mit Status: {:?}", status.code());
+        std::process::exit(status.code().unwrap_or(1));
     }
 
     Ok(())
@@ -99,16 +104,15 @@ fn run_terminal_mode(args: &CliArgs) -> Result<(), Box<dyn std::error::Error>> {
     let date_parts: Vec<&str> = args.date.split('-').collect();
     let time_parts: Vec<&str> = args.time.split(':').collect();
 
-    if date_parts.len() < 3 || time_parts.len() < 2 {
-        eprintln!("Fehler: Ungültiges Datums- oder Zeitformat.");
-        return Ok(());
+    if date_parts.len() != 3 || time_parts.len() != 2 {
+        return Err("Ungültiges Datums- oder Zeitformat (erwartet: --date JJJJ-MM-TT --time HH:MM).".into());
     }
 
-    let year: i32 = date_parts[0].parse()?;
-    let month: i32 = date_parts[1].parse()?;
-    let day: i32 = date_parts[2].parse()?;
-    let hour: u32 = time_parts[0].parse()?;
-    let minute: u32 = time_parts[1].parse()?;
+    let year: i32 = date_parts[0].parse().map_err(|e| format!("Ungültige Zahl: {}", e))?;
+    let month: i32 = date_parts[1].parse().map_err(|e| format!("Ungültige Zahl: {}", e))?;
+    let day: i32 = date_parts[2].parse().map_err(|e| format!("Ungültige Zahl: {}", e))?;
+    let hour: u32 = time_parts[0].parse().map_err(|e| format!("Ungültige Zahl: {}", e))?;
+    let minute: u32 = time_parts[1].parse().map_err(|e| format!("Ungültige Zahl: {}", e))?;
 
     let req = ChartRequest {
         name: args.name.clone(),

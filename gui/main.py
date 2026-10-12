@@ -21,7 +21,7 @@ import styles
 def main():
     app = QApplication(sys.argv)
     app.setApplicationName("Astrorust")
-    app.setApplicationVersion("1.0.0")
+    app.setApplicationVersion("1.0.1")
     app.setOrganizationName("Astrorust")
     app.setDesktopFileName("astrorust")
 

@@ -1,4 +1,5 @@
 use crate::astrology::models::ChartResponse;
+use crate::astrology::util::xml_escape;
 
 pub fn generate_chart_svg(chart: &ChartResponse) -> String {
     let size = 900.0;
@@ -185,15 +186,18 @@ pub fn generate_chart_svg(chart: &ChartResponse) -> String {
     // Chart header info
     svg.push_str(&format!(
         r##"<text x="30" y="45" fill="#f8fafc" font-size="22" font-weight="bold">{}</text>"##,
-        chart.name
+        xml_escape(&chart.name)
     ));
     svg.push_str(&format!(
         r##"<text x="30" y="70" fill="#94a3b8" font-size="14">{} • {}</text>"##,
-        chart.date_time, chart.location_name
+        xml_escape(&chart.date_time),
+        xml_escape(&chart.location_name)
     ));
     svg.push_str(&format!(
         r##"<text x="30" y="90" fill="#fbbf24" font-size="13">AC: {} | MC: {} | {}</text>"##,
-        chart.angles.ascendant_formatted, chart.angles.midheaven_formatted, chart.house_system
+        chart.angles.ascendant_formatted,
+        chart.angles.midheaven_formatted,
+        xml_escape(&chart.house_system)
     ));
 
     svg.push_str("</svg>");
