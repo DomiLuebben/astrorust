@@ -29,7 +29,7 @@ Astrorust kombiniert die Zuverlässigkeit und Geschwindigkeit von **Rust** mit e
 
 * **🔮 Multi-Provider KI-Deutungsengine (Astroplus-Parität):**
   * **Lokale KIs & CLIs:** Automatische Erkennung von Claude Code CLI (`claude`), Codex CLI (`codex`), lokalem Ollama (`http://127.0.0.1:11434`) oder LM Studio / vLLM.
-  * **API-Keys & GenOffice-Import:** 1-Klick-Import hinterlegter Schlüssel (Anthropic, OpenAI, Google Gemini, DeepSeek, OpenRouter, Mistral) aus `~/.config/GenOffice/ai-settings.json`.
+  * **Bring-Your-Own-Key (BYOK) wie in GenOffice:** Freie Wahl des bevorzugten Providers (Google Gemini, Anthropic Claude, OpenAI, DeepSeek, OpenRouter), eigene API-Keys und frei anpassbare Modellnamen.
   * **7 tiefenpsychologische Deutungsmodule (Jungianisch / Liz Greene):**
     1. 🌟 *Großes Radix-Persönlichkeitsprofil*
     2. 🏛️ *Berufung, Karriere & Lebensziel* (MC & 10. Haus)

@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 """
 Astrorust — KI-Einstellungen Dialog (Breeze Dark / LME Stil)
+Bring-Your-Own-Key (BYOK) Architektur für alle gängigen KI-Provider und lokale LLMs.
 """
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QComboBox,
-    QLineEdit, QPushButton, QGroupBox, QMessageBox
+    QLineEdit, QPushButton, QGroupBox, QTabWidget, QWidget, QMessageBox
 )
 
 from ai_engine import AiConfig, detect_environment
@@ -16,8 +17,8 @@ import styles
 class AiSettingsDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("KI-Deutung Einstellungen")
-        self.setMinimumWidth(560)
+        self.setWindowTitle("KI-Deutung — Provider & API-Keys")
+        self.setMinimumWidth(620)
         self.setStyleSheet(styles.DARK_STYLESHEET)
 
         self.cfg = AiConfig.load()
@@ -58,78 +59,102 @@ class AiSettingsDialog(QDialog):
 
         l_prov.addWidget(QLabel("Bevorzugter Dienst:"), 0, 0)
         self.combo_provider = QComboBox()
-        self.combo_provider.addItem("Automatische Erkennung (Auto-Detect)", "auto")
+        self.combo_provider.addItem("Automatische Erkennung (Auto-Detect: Lokale CLIs > API-Keys)", "auto")
         if self.env["claude_cli"]:
             self.combo_provider.addItem("⚡ Claude Code CLI (Lokal ohne Key)", "claude_cli")
         if self.env["codex_cli"]:
             self.combo_provider.addItem("⚡ Codex CLI (Lokal)", "codex_cli")
         self.combo_provider.addItem("🦙 Ollama (Lokal)", "ollama")
-        self.combo_provider.addItem("🔑 Anthropic (Claude API)", "anthropic")
-        self.combo_provider.addItem("🔑 OpenAI (GPT-4o API)", "openai")
         self.combo_provider.addItem("🔑 Google Gemini API", "gemini")
-        self.combo_provider.addItem("🔑 OpenRouter API", "openrouter")
+        self.combo_provider.addItem("🔑 Anthropic (Claude API)", "anthropic")
+        self.combo_provider.addItem("🔑 OpenAI (GPT API)", "openai")
         self.combo_provider.addItem("🔑 DeepSeek API", "deepseek")
-        self.combo_provider.addItem("🌐 Eigener Endpoint (OpenAI-kompatibel)", "custom")
+        self.combo_provider.addItem("🔑 OpenRouter API", "openrouter")
+        self.combo_provider.addItem("🌐 Eigener Endpoint (OpenAI-kompatibel / LM Studio / vLLM)", "custom")
 
         l_prov.addWidget(self.combo_provider, 0, 1)
-
-        btn_import_genoffice = QPushButton("📥 Aus GenOffice importieren")
-        btn_import_genoffice.setToolTip("Übernimmt gespeicherte API-Keys und Modelle aus ~/.config/GenOffice/ai-settings.json")
-        btn_import_genoffice.clicked.connect(self._import_genoffice)
-        l_prov.addWidget(btn_import_genoffice, 0, 2)
-
         layout.addWidget(box_prov)
 
-        # 3. API-Schlüssel
-        box_keys = QGroupBox("API-Schlüssel (Direktzugriff)")
-        l_keys = QGridLayout(box_keys)
-        l_keys.setSpacing(6)
+        # 3. Provider Konfiguration (Tabs: Cloud Provider & Lokale Server)
+        tab_widget = QTabWidget()
 
-        l_keys.addWidget(QLabel("Anthropic API-Key:"), 0, 0)
-        self.edit_key_anthropic = QLineEdit()
-        self.edit_key_anthropic.setEchoMode(QLineEdit.EchoMode.Password)
-        self.edit_key_anthropic.setPlaceholderText("sk-ant-...")
-        l_keys.addWidget(self.edit_key_anthropic, 0, 1)
+        # Tab Cloud Providers
+        tab_cloud = QWidget()
+        l_cloud = QGridLayout(tab_cloud)
+        l_cloud.setSpacing(10)
 
-        l_keys.addWidget(QLabel("OpenAI API-Key:"), 1, 0)
-        self.edit_key_openai = QLineEdit()
-        self.edit_key_openai.setEchoMode(QLineEdit.EchoMode.Password)
-        self.edit_key_openai.setPlaceholderText("sk-proj-...")
-        l_keys.addWidget(self.edit_key_openai, 1, 1)
+        # Header
+        l_cloud.addWidget(QLabel("<b>Provider</b>"), 0, 0)
+        l_cloud.addWidget(QLabel("<b>API-Key</b>"), 0, 1)
+        l_cloud.addWidget(QLabel("<b>Modell</b>"), 0, 2)
 
-        l_keys.addWidget(QLabel("Gemini API-Key:"), 2, 0)
-        self.edit_key_gemini = QLineEdit()
-        self.edit_key_gemini.setEchoMode(QLineEdit.EchoMode.Password)
-        self.edit_key_gemini.setPlaceholderText("AIzaSy...")
-        l_keys.addWidget(self.edit_key_gemini, 2, 1)
+        # Google Gemini
+        l_cloud.addWidget(QLabel("Google Gemini:"), 1, 0)
+        self.edit_key_gemini = self._create_password_edit("AIzaSy...")
+        self.edit_model_gemini = QLineEdit()
+        self.edit_model_gemini.setPlaceholderText("gemini-1.5-pro")
+        l_cloud.addLayout(self.edit_key_gemini["layout"], 1, 1)
+        l_cloud.addWidget(self.edit_model_gemini, 1, 2)
 
-        l_keys.addWidget(QLabel("OpenRouter / DeepSeek:"), 3, 0)
-        self.edit_key_openrouter = QLineEdit()
-        self.edit_key_openrouter.setEchoMode(QLineEdit.EchoMode.Password)
-        self.edit_key_openrouter.setPlaceholderText("sk-or-...")
-        l_keys.addWidget(self.edit_key_openrouter, 3, 1)
+        # Anthropic Claude
+        l_cloud.addWidget(QLabel("Anthropic (Claude):"), 2, 0)
+        self.edit_key_anthropic = self._create_password_edit("sk-ant-...")
+        self.edit_model_anthropic = QLineEdit()
+        self.edit_model_anthropic.setPlaceholderText("claude-3-5-sonnet-20241022")
+        l_cloud.addLayout(self.edit_key_anthropic["layout"], 2, 1)
+        l_cloud.addWidget(self.edit_model_anthropic, 2, 2)
 
-        layout.addWidget(box_keys)
+        # OpenAI
+        l_cloud.addWidget(QLabel("OpenAI (GPT):"), 3, 0)
+        self.edit_key_openai = self._create_password_edit("sk-proj-...")
+        self.edit_model_openai = QLineEdit()
+        self.edit_model_openai.setPlaceholderText("gpt-4o")
+        l_cloud.addLayout(self.edit_key_openai["layout"], 3, 1)
+        l_cloud.addWidget(self.edit_model_openai, 3, 2)
 
-        # 4. Lokale / Eigene Server URLs
-        box_endpoints = QGroupBox("Lokale Endpoints")
-        l_end = QGridLayout(box_endpoints)
+        # DeepSeek
+        l_cloud.addWidget(QLabel("DeepSeek:"), 4, 0)
+        self.edit_key_deepseek = self._create_password_edit("sk-...")
+        self.edit_model_deepseek = QLineEdit()
+        self.edit_model_deepseek.setPlaceholderText("deepseek-chat")
+        l_cloud.addLayout(self.edit_key_deepseek["layout"], 4, 1)
+        l_cloud.addWidget(self.edit_model_deepseek, 4, 2)
 
-        l_end.addWidget(QLabel("Ollama URL & Modell:"), 0, 0)
+        # OpenRouter
+        l_cloud.addWidget(QLabel("OpenRouter:"), 5, 0)
+        self.edit_key_openrouter = self._create_password_edit("sk-or-...")
+        self.edit_model_openrouter = QLineEdit()
+        self.edit_model_openrouter.setPlaceholderText("deepseek/deepseek-chat")
+        l_cloud.addLayout(self.edit_key_openrouter["layout"], 5, 1)
+        l_cloud.addWidget(self.edit_model_openrouter, 5, 2)
+
+        tab_widget.addTab(tab_cloud, "🔑 Cloud API-Keys")
+
+        # Tab Lokale Server
+        tab_local = QWidget()
+        l_local = QGridLayout(tab_local)
+        l_local.setSpacing(10)
+
+        l_local.addWidget(QLabel("<b>Dienst</b>"), 0, 0)
+        l_local.addWidget(QLabel("<b>Server-URL</b>"), 0, 1)
+        l_local.addWidget(QLabel("<b>Modell</b>"), 0, 2)
+
+        l_local.addWidget(QLabel("Ollama:"), 1, 0)
         self.edit_ollama_url = QLineEdit()
         self.edit_ollama_model = QLineEdit()
-        l_end.addWidget(self.edit_ollama_url, 0, 1)
-        l_end.addWidget(self.edit_ollama_model, 0, 2)
+        l_local.addWidget(self.edit_ollama_url, 1, 1)
+        l_local.addWidget(self.edit_ollama_model, 1, 2)
 
-        l_end.addWidget(QLabel("Custom URL & Modell:"), 1, 0)
+        l_local.addWidget(QLabel("Custom Endpoint:"), 2, 0)
         self.edit_custom_url = QLineEdit()
         self.edit_custom_model = QLineEdit()
-        l_end.addWidget(self.edit_custom_url, 1, 1)
-        l_end.addWidget(self.edit_custom_model, 1, 2)
+        l_local.addWidget(self.edit_custom_url, 2, 1)
+        l_local.addWidget(self.edit_custom_model, 2, 2)
 
-        layout.addWidget(box_endpoints)
+        tab_widget.addTab(tab_local, "🌐 Lokale Server / Ollama")
+        layout.addWidget(tab_widget)
 
-        # 5. Buttons
+        # 4. Buttons
         h_btn = QHBoxLayout()
         h_btn.addStretch()
 
@@ -144,6 +169,33 @@ class AiSettingsDialog(QDialog):
 
         layout.addLayout(h_btn)
 
+    def _create_password_edit(self, placeholder=""):
+        h_box = QHBoxLayout()
+        h_box.setContentsMargins(0, 0, 0, 0)
+        h_box.setSpacing(4)
+
+        edit = QLineEdit()
+        edit.setEchoMode(QLineEdit.EchoMode.Password)
+        edit.setPlaceholderText(placeholder)
+
+        btn_toggle = QPushButton("👁")
+        btn_toggle.setFixedWidth(30)
+        btn_toggle.setToolTip("Passwort anzeigen/verbergen")
+
+        def toggle():
+            if edit.echoMode() == QLineEdit.EchoMode.Password:
+                edit.setEchoMode(QLineEdit.EchoMode.Normal)
+                btn_toggle.setText("🔒")
+            else:
+                edit.setEchoMode(QLineEdit.EchoMode.Password)
+                btn_toggle.setText("👁")
+
+        btn_toggle.clicked.connect(toggle)
+        h_box.addWidget(edit)
+        h_box.addWidget(btn_toggle)
+
+        return {"layout": h_box, "edit": edit, "btn": btn_toggle}
+
     def _load_values(self):
         prov = self.cfg.get("active_provider", "auto")
         idx = self.combo_provider.findData(prov)
@@ -151,38 +203,45 @@ class AiSettingsDialog(QDialog):
             self.combo_provider.setCurrentIndex(idx)
 
         keys = self.cfg.get("api_keys", {})
-        self.edit_key_anthropic.setText(keys.get("anthropic", ""))
-        self.edit_key_openai.setText(keys.get("openai", ""))
-        self.edit_key_gemini.setText(keys.get("gemini", ""))
-        self.edit_key_openrouter.setText(keys.get("openrouter", "") or keys.get("deepseek", ""))
+        models = self.cfg.get("models", {})
+
+        self.edit_key_gemini["edit"].setText(keys.get("gemini", ""))
+        self.edit_key_anthropic["edit"].setText(keys.get("anthropic", ""))
+        self.edit_key_openai["edit"].setText(keys.get("openai", ""))
+        self.edit_key_deepseek["edit"].setText(keys.get("deepseek", ""))
+        self.edit_key_openrouter["edit"].setText(keys.get("openrouter", ""))
+
+        self.edit_model_gemini.setText(models.get("gemini", "gemini-1.5-pro"))
+        self.edit_model_anthropic.setText(models.get("anthropic", "claude-3-5-sonnet-20241022"))
+        self.edit_model_openai.setText(models.get("openai", "gpt-4o"))
+        self.edit_model_deepseek.setText(models.get("deepseek", "deepseek-chat"))
+        self.edit_model_openrouter.setText(models.get("openrouter", "deepseek/deepseek-chat"))
 
         self.edit_ollama_url.setText(self.cfg.get("ollama_url", "http://127.0.0.1:11434"))
         self.edit_ollama_model.setText(self.cfg.get("ollama_model", "mistral"))
         self.edit_custom_url.setText(self.cfg.get("custom_url", "http://127.0.0.1:1234/v1"))
         self.edit_custom_model.setText(self.cfg.get("custom_model", "local-model"))
 
-    def _import_genoffice(self):
-        count = AiConfig.import_from_genoffice(self.cfg)
-        if count > 0:
-            self._load_values()
-            QMessageBox.information(
-                self, "Import erfolgreich",
-                f"{count} API-Schlüssel & Modell-Einstellungen wurden erfolgreich aus GenOffice übernommen!"
-            )
-        else:
-            QMessageBox.warning(
-                self, "GenOffice Import",
-                "In ~/.config/GenOffice/ai-settings.json wurden keine hinterlegten API-Schlüssel gefunden."
-            )
-
     def _save_and_close(self):
         self.cfg["active_provider"] = self.combo_provider.currentData()
-        self.cfg["api_keys"]["anthropic"] = self.edit_key_anthropic.text().strip()
-        self.cfg["api_keys"]["openai"] = self.edit_key_openai.text().strip()
-        self.cfg["api_keys"]["gemini"] = self.edit_key_gemini.text().strip()
-        self.cfg["api_keys"]["openrouter"] = self.edit_key_openrouter.text().strip()
-        self.cfg["api_keys"]["deepseek"] = self.edit_key_openrouter.text().strip()
 
+        # Keys
+        self.cfg["api_keys"]["gemini"] = self.edit_key_gemini["edit"].text().strip()
+        self.cfg["api_keys"]["anthropic"] = self.edit_key_anthropic["edit"].text().strip()
+        self.cfg["api_keys"]["openai"] = self.edit_key_openai["edit"].text().strip()
+        self.cfg["api_keys"]["deepseek"] = self.edit_key_deepseek["edit"].text().strip()
+        self.cfg["api_keys"]["openrouter"] = self.edit_key_openrouter["edit"].text().strip()
+
+        # Models
+        if "models" not in self.cfg:
+            self.cfg["models"] = {}
+        self.cfg["models"]["gemini"] = self.edit_model_gemini.text().strip() or "gemini-1.5-pro"
+        self.cfg["models"]["anthropic"] = self.edit_model_anthropic.text().strip() or "claude-3-5-sonnet-20241022"
+        self.cfg["models"]["openai"] = self.edit_model_openai.text().strip() or "gpt-4o"
+        self.cfg["models"]["deepseek"] = self.edit_model_deepseek.text().strip() or "deepseek-chat"
+        self.cfg["models"]["openrouter"] = self.edit_model_openrouter.text().strip() or "deepseek/deepseek-chat"
+
+        # Endpoints
         self.cfg["ollama_url"] = self.edit_ollama_url.text().strip()
         self.cfg["ollama_model"] = self.edit_ollama_model.text().strip()
         self.cfg["custom_url"] = self.edit_custom_url.text().strip()

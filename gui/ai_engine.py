@@ -12,7 +12,6 @@ import urllib.error
 import ssl
 from PyQt6.QtCore import QThread, pyqtSignal
 
-GENOFFICE_SETTINGS_PATH = os.path.expanduser("~/.config/GenOffice/ai-settings.json")
 ASTRORUST_CONFIG_DIR = os.path.expanduser("~/.config/astrorust")
 ASTRORUST_AI_SETTINGS = os.path.join(ASTRORUST_CONFIG_DIR, "ai_settings.json")
 
@@ -56,9 +55,8 @@ class AiConfig:
             except Exception as e:
                 print("Fehler beim Laden der KI-Einstellungen:", e)
 
-        # First run: try auto-import from GenOffice
+        # First run: initialize with defaults
         cfg = dict(cls.DEFAULT_CONFIG)
-        cls.import_from_genoffice(cfg)
         cls.save(cfg)
         return cfg
 
@@ -70,36 +68,6 @@ class AiConfig:
                 json.dump(config_dict, f, indent=2, ensure_ascii=False)
         except Exception as e:
             print("Fehler beim Speichern der KI-Einstellungen:", e)
-
-    @classmethod
-    def import_from_genoffice(cls, target_config):
-        if not os.path.exists(GENOFFICE_SETTINGS_PATH):
-            return 0
-
-        imported = 0
-        try:
-            with open(GENOFFICE_SETTINGS_PATH, "r", encoding="utf-8") as f:
-                go_data = json.load(f)
-
-            providers = go_data.get("providers", {})
-            for p_name, p_data in providers.items():
-                key = p_data.get("apiKey") or p_data.get("key")
-                if key:
-                    if p_name in target_config["api_keys"]:
-                        target_config["api_keys"][p_name] = key
-                        imported += 1
-                    elif p_name == "google":
-                        target_config["api_keys"]["gemini"] = key
-                        imported += 1
-
-                model = p_data.get("model")
-                if model and p_name in target_config["models"]:
-                    target_config["models"][p_name] = model
-
-        except Exception as e:
-            print("Fehler beim Import aus GenOffice:", e)
-
-        return imported
 
 
 def detect_environment():
