@@ -18,11 +18,99 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtGui import QAction, QFont, QColor
 
+import re
+from PyQt6.QtWidgets import QCalendarWidget, QDialog
+from PyQt6.QtGui import QIcon
 from chart_wheel import ChartWheelWidget
 from rust_backend import RustBackend
 from ai_engine import AiConfig, AiGenerationWorker, detect_environment
 from ai_dialog import AiSettingsDialog
 import styles
+
+
+class AstroDateEdit(QLineEdit):
+    """
+    Flexibles, intuitives Datumseingabefeld.
+    Erlaubt freies Tippen (z. B. '1985-05-15', '15.05.1985', '1985/05/15'),
+    Löschen per Backspace ohne Qt-Sektions-Sperre und bietet zusätzlich
+    ein Kalender-Icon zum visuellen Auswählen.
+    """
+    def __init__(self, default_date=None, parent=None):
+        super().__init__(parent)
+        self.setPlaceholderText("JJJJ-MM-TT oder TT.MM.JJJJ")
+        self._current_date = default_date or QDate.currentDate()
+        self.setText(self._current_date.toString("yyyy-MM-dd"))
+
+        # Kalender-Icon rechts im Feld
+        cal_icon = QIcon.fromTheme("view-calendar", QIcon.fromTheme("x-office-calendar"))
+        if cal_icon.isNull():
+            cal_icon = self.style().standardIcon(self.style().StandardPixmap.SP_FileDialogStart)
+        self.cal_action = self.addAction(cal_icon, QLineEdit.ActionPosition.TrailingPosition)
+        self.cal_action.setToolTip("Kalender öffnen")
+        self.cal_action.triggered.connect(self._open_calendar)
+
+        self.editingFinished.connect(self._on_editing_finished)
+
+    def setDate(self, qdate: QDate):
+        if qdate and qdate.isValid():
+            self._current_date = qdate
+            self.setText(qdate.toString("yyyy-MM-dd"))
+
+    def date(self) -> QDate:
+        self._parse_text()
+        return self._current_date
+
+    def _parse_text(self):
+        text = self.text().strip()
+        if not text:
+            return
+
+        # 1. Format: JJJJ-MM-TT / JJJJ.MM.TT / JJJJ/MM/TT
+        m = re.match(r"^(\d{3,4})[-/.](\d{1,2})[-/.](\d{1,2})$", text)
+        if m:
+            y, mth, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
+            qd = QDate(y, mth, d)
+            if qd.isValid():
+                self._current_date = qd
+                return
+
+        # 2. Format: TT.MM.JJJJ / TT/MM/JJJJ
+        m = re.match(r"^(\d{1,2})[-/.](\d{1,2})[-/.](\d{3,4})$", text)
+        if m:
+            d, mth, y = int(m.group(1)), int(m.group(2)), int(m.group(3))
+            qd = QDate(y, mth, d)
+            if qd.isValid():
+                self._current_date = qd
+                return
+
+    def _on_editing_finished(self):
+        self._parse_text()
+        if self._current_date.isValid():
+            self.setText(self._current_date.toString("yyyy-MM-dd"))
+
+    def _open_calendar(self):
+        self._parse_text()
+        dlg = QDialog(self, Qt.WindowType.Popup)
+        l = QVBoxLayout(dlg)
+        l.setContentsMargins(6, 6, 6, 6)
+        cal = QCalendarWidget(dlg)
+        cal.setGridVisible(True)
+        cal.setVerticalHeaderFormat(QCalendarWidget.VerticalHeaderFormat.NoVerticalHeader)
+        if self._current_date.isValid():
+            cal.setSelectedDate(self._current_date)
+        cal.activated.connect(lambda d: (self.setDate(d), dlg.accept()))
+        cal.clicked.connect(lambda d: (self.setDate(d), dlg.accept()))
+        l.addWidget(cal)
+
+        pos = self.mapToGlobal(self.rect().bottomLeft())
+        dlg.move(pos)
+        dlg.exec()
+
+    def setCalendarPopup(self, _):
+        pass
+
+    def setDisplayFormat(self, _):
+        pass
 
 
 class MainWindow(QMainWindow):
@@ -201,10 +289,7 @@ class MainWindow(QMainWindow):
         l_nat.addWidget(self.edit_name, 0, 1, 1, 2)
 
         l_nat.addWidget(QLabel("Datum:"), 1, 0)
-        self.edit_date = QDateEdit()
-        self.edit_date.setCalendarPopup(True)
-        self.edit_date.setDisplayFormat("yyyy-MM-dd")
-        self.edit_date.setDate(QDate(1879, 3, 14))
+        self.edit_date = AstroDateEdit(QDate(1879, 3, 14))
         l_nat.addWidget(self.edit_date, 1, 1)
 
         self.edit_time = QTimeEdit()
@@ -259,10 +344,7 @@ class MainWindow(QMainWindow):
         l_syn.addWidget(self.edit_name_b, 0, 1, 1, 2)
 
         l_syn.addWidget(QLabel("Datum:"), 1, 0)
-        self.edit_date_b = QDateEdit()
-        self.edit_date_b.setCalendarPopup(True)
-        self.edit_date_b.setDisplayFormat("yyyy-MM-dd")
-        self.edit_date_b.setDate(QDate(1875, 12, 19))
+        self.edit_date_b = AstroDateEdit(QDate(1875, 12, 19))
         l_syn.addWidget(self.edit_date_b, 1, 1)
 
         self.edit_time_b = QTimeEdit()
